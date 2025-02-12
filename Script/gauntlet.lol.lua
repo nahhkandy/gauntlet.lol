@@ -21,6 +21,10 @@ end
 
 getgenv().GauntletLoaded = true
 
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local useCameraPosition = isMobile
+local lastTouchPosition = nil
+
 local ThumbType = Enum.ThumbnailType.HeadShot
 local ThumbSize = Enum.ThumbnailSize.Size420x420
 local LocalPlayer = Players.LocalPlayer
@@ -144,7 +148,7 @@ VersionText.Parent = Main
 
 local function fetchVersion()
     if true then
-        VersionText.Text = "VERSION: 1.00a (release)"
+        VersionText.Text = "VERSION: 1.00b (release)"
     else
         VersionText.Text = "failed fetching version :("
     end
@@ -374,6 +378,38 @@ TrajectoryButton.BackgroundTransparency = 1
 TrajectoryButton.Position = UDim2.new(0.81, 0.00, 0.62, 0.00)
 TrajectoryButton.Visible = false
 TrajectoryButton.Parent = TrajectoryToggle
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.BackgroundTransparency = 1
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.BackgroundColor3 = Color3.new(1, 1, 1)
+MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.TextSize = 20
+MinimizeButton.Size = UDim2.new(0.1, 0, 0.1, 0)
+MinimizeButton.TextColor3 = Color3.new(255, 0, 0)
+MinimizeButton.Text = "-"
+MinimizeButton.Position = UDim2.new(0.9, 0, 0, 0)
+MinimizeButton.Parent = Main
+
+local TouchKeyboard = Instance.new("Frame")
+TouchKeyboard.Name = "TouchKeyboard"
+TouchKeyboard.Size = UDim2.new(0.3, 0, 0.15, 0) 
+TouchKeyboard.Position = UDim2.new(0.35, 0, 0.8, 0)
+TouchKeyboard.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+TouchKeyboard.BackgroundTransparency = 0.5
+TouchKeyboard.Visible = isMobile
+TouchKeyboard.Parent = SG
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    isMinimized = true
+    StarterGui:SetCore("SendNotification", {
+    Title = "gauntlet.lol Info Message";
+    Text = "Press CTRL to open the GUI back up (G for mobile)";
+    Duration = 5;
+})
+end)
 
 local function toggleCheckorx()
     local isChecked = Checkorx.Text == "✅"
@@ -724,5 +760,139 @@ Players.PlayerRemoving:Connect(function(player)
     if player == LocalPlayer then
         trajectoryUpdateConnection:Disconnect()
         TrajectoryFolder:Destroy()
+    end
+end)
+
+local function mobileFling()
+    if Checkorx.Text == "✅" then
+        local char = LocalPlayer.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local camera = workspace.CurrentCamera
+                local dir = (camera.CFrame.Position - root.Position).Unit
+                
+                local bv = Instance.new("BodyVelocity")
+                bv.Velocity = dir * force
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.P = 10000
+                bv.Parent = root
+                
+                local bav = Instance.new("BodyAngularVelocity")
+                bav.AngularVelocity = Vector3.new(math.random(-5, 5), math.random(-5, 5), math.random(-5, 5)) * 5
+                bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bav.P = 10000
+                bav.Parent = root
+                
+                game:GetService("Debris"):AddItem(bv, 0.1)
+                game:GetService("Debris"):AddItem(bav, 0.1)
+            end
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    
+    if (isMobile and input.KeyCode == Enum.KeyCode.G) or
+       (not isMobile and input.KeyCode == Enum.KeyCode.LeftControl) then
+        if isMinimized then
+            isMinimized = false
+            Main.Visible = true
+        end
+    end
+    
+    if input.KeyCode == Enum.KeyCode.F then
+        mobileFling()
+    elseif input.UserInputType == Enum.UserInputType.Touch then
+        lastTouchPosition = input.Position
+        mobileFling()
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        lastTouchPosition = nil
+    end
+end)
+
+local isDraggingKeyboard = false
+local keyboardDragStart = nil
+local keyboardStartPos = nil
+
+local function updateKeyboardPosition(input)
+    local delta = input.Position - keyboardDragStart
+    TouchKeyboard.Position = UDim2.new(
+        keyboardStartPos.X.Scale, 
+        keyboardStartPos.X.Offset + delta.X,
+        keyboardStartPos.Y.Scale,
+        keyboardStartPos.Y.Offset + delta.Y
+    )
+end
+
+local function createTouchButton(text, position)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.45, 0, 0.8, 0)
+    button.Position = position
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    button.TextSize = 18
+    button.Parent = TouchKeyboard
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.1, 0)
+    corner.Parent = button
+    
+    button.MouseButton1Down:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.4, 0.4, 0.4)
+    end)
+    
+    button.MouseButton1Up:Connect(function()
+        button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    end)
+    
+    return button
+end
+
+local dragHandle = Instance.new("Frame")
+dragHandle.Size = UDim2.new(1, 0, 0.2, 0)
+dragHandle.Position = UDim2.new(0, 0, -0.2, 0)
+dragHandle.BackgroundColor3 = Color3.new(0.25, 0.25, 0.25)
+dragHandle.BackgroundTransparency = 0.3
+dragHandle.Parent = TouchKeyboard
+
+local handleCorner = Instance.new("UICorner")
+handleCorner.CornerRadius = UDim.new(0.2, 0)
+handleCorner.Parent = dragHandle
+
+dragHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingKeyboard = true
+        keyboardDragStart = input.Position
+        keyboardStartPos = TouchKeyboard.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDraggingKeyboard = false
+            end
+        end)
+    end
+end)
+
+dragHandle.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch and isDraggingKeyboard then
+        updateKeyboardPosition(input)
+    end
+end)
+
+local flingButton = createTouchButton("Fling (F)", UDim2.new(0.025, 0, 0.1, 0))
+local toggleButton = createTouchButton("Toggle (G)", UDim2.new(0.525, 0, 0.1, 0))
+
+flingButton.MouseButton1Click:Connect(mobileFling)
+toggleButton.MouseButton1Click:Connect(function()
+    if isMinimized then
+        isMinimized = false
+        Main.Visible = true
     end
 end)
