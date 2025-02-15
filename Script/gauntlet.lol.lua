@@ -6,34 +6,11 @@ local TweenService = cref(game:GetService("TweenService"))
 local UserInputService = cref(game:GetService("UserInputService"))
 local RunService = cref(game:GetService("RunService"))
 local HttpService = cref(game:GetService("HttpService"))
+local LocalPlayer = Players.LocalPlayer
 
 local TrajectoryFolder = Instance.new("Folder")
 TrajectoryFolder.Name = "TrajectoryViewer"
 TrajectoryFolder.Parent = workspace
-
-if getgenv().GauntletLoaded then
-    return StarterGui:SetCore("SendNotification", {
-    Title = "gauntlet.lol Error Message";
-    Text = "You cannot run multiple instance of gauntlet.lol!";
-    Duration = 5;
-})
-end
-
-getgenv().GauntletLoaded = true
-
-local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local useCameraPosition = isMobile
-local lastTouchPosition = nil
-
-local ThumbType = Enum.ThumbnailType.HeadShot
-local ThumbSize = Enum.ThumbnailSize.Size420x420
-local LocalPlayer = Players.LocalPlayer
-local ID = LocalPlayer.UserId
-
-local Mouse = LocalPlayer:GetMouse()
-local force = 1000
-local draggingSlider = false
-
 
 local SG = Instance.new("ScreenGui")
 SG.Name = ""
@@ -41,50 +18,163 @@ SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SG.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local Main = Instance.new("ImageLabel")
+local function notify(title, message, type, duration)
+    duration = duration or 5
+
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 300, 0, 80)
+    notification.Position = UDim2.new(1, 20, 1, -100)
+    notification.BackgroundTransparency = 0.1
+    notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    notification.Parent = SG
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notification
+
+    local sideBar = Instance.new("Frame")
+    sideBar.Size = UDim2.new(0, 4, 1, 0)
+    sideBar.Position = UDim2.new(0, 0, 0, 0)
+    sideBar.BorderSizePixel = 0
+    sideBar.Parent = notification
+
+    local typeColors = {
+        error = Color3.fromRGB(255, 64, 64),
+        info = Color3.fromRGB(64, 156, 255),
+        warning = Color3.fromRGB(255, 164, 64),
+        success = Color3.fromRGB(64, 255, 128)
+    }
+    sideBar.BackgroundColor3 = typeColors[type] or Color3.fromRGB(200, 200, 200)
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -20, 0, 25)
+    titleLabel.Position = UDim2.new(0, 15, 0, 5)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextSize = 18
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = notification
+
+    local messageLabel = Instance.new("TextLabel")
+    messageLabel.Size = UDim2.new(1, -20, 0, 40)
+    messageLabel.Position = UDim2.new(0, 15, 0, 35)
+    messageLabel.BackgroundTransparency = 1
+    messageLabel.Text = message
+    messageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    messageLabel.TextSize = 14
+    messageLabel.Font = Enum.Font.Gotham
+    messageLabel.TextXAlignment = Enum.TextXAlignment.Left
+    messageLabel.TextWrapped = true
+    messageLabel.Parent = notification
+
+    local progressBar = Instance.new("Frame")
+    progressBar.Size = UDim2.new(0, 0, 0, 4)
+    progressBar.Position = UDim2.new(0, 0, 1, -4)
+    progressBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    progressBar.BorderSizePixel = 0
+    progressBar.Parent = notification
+
+    local progressCorner = Instance.new("UICorner")
+    progressCorner.CornerRadius = UDim.new(1, 0)
+    progressCorner.Parent = progressBar
+
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://6026984224"
+    sound.Volume = 1
+    sound.Parent = notification
+    sound:Play()
+
+    local tweenIn = TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(1, -320, 1, -100)})
+    tweenIn:Play()
+
+    local progressTween = TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 4)})
+    progressTween:Play()
+
+    task.delay(duration, function()
+        local fadeOut = TweenService:Create(notification, TweenInfo.new(0.3), {Position = UDim2.new(1, 20, 1, -100)})
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        notification:Destroy()
+    end)
+end
+
+if _G.GauntletLoaded then
+    notify("gauntlet.lol Error", "You cannot run multiple instances of gauntlet.lol!", "error", 5)
+    return
+end
+_G.GauntletLoaded = true
+
+local ThumbType = Enum.ThumbnailType.HeadShot
+local ThumbSize = Enum.ThumbnailSize.Size420x420
+local ID = LocalPlayer.UserId
+
+local Mouse = LocalPlayer:GetMouse()
+local force = 1000
+local draggingSlider = false
+
+notify("gauntlet.lol Info", "Script executed successfully", "success", 5)
+
+local Main = Instance.new("Frame")
 Main.Name = "Main"
+Main.Size = UDim2.new(0, 400, 0, 500)
+Main.Position = UDim2.new(0.5, -200, 0.5, -250)
+Main.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Main.BorderSizePixel = 0
-Main.BackgroundColor3 = Color3.new(0.26, 0.26, 0.26)
-Main.ImageTransparency = 0.30000001192092896
-Main.Image = "rbxassetid://6975920113"
-Main.Size = UDim2.new(0.25, 100.00, 0.49, 100.00)
-Main.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-Main.Position = UDim2.new(0.38, 0.00, 0.12, 0.00)
 Main.Parent = SG
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = Main
+
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 50)
+TopBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 12)
+TopBarCorner.Parent = TopBar
+
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(0.7, 0, 1, 0)
+Title.Position = UDim2.new(0.02, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "gauntlet.lol"
+Title.TextColor3 = Color3.fromRGB(250, 227, 54)
+Title.TextSize = 22
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
 
 local User = Instance.new("TextLabel")
 User.Name = "User"
-User.BorderSizePixel = 0
-User.BackgroundColor3 = Color3.new(0.14, 0.14, 0.14)
-User.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-User.TextXAlignment = Enum.TextXAlignment.Left
-User.TextSize = 40
-User.Size = UDim2.new(0.22, 200.00, 0.01, 50.00)
-User.Text = "Hello, " .. LocalPlayer.Name .. "!"
-User.TextColor3 = Color3.new(1.00, 1.00, 1.00)
+User.Size = UDim2.new(0.5, 0, 0, 40)
+User.Position = UDim2.new(0.02, 0, 0.9, 0)
 User.BackgroundTransparency = 1
-User.Position = UDim2.new(-0.00, 0.00, 0.89, 0.00)
+User.Text = "Hello, " .. LocalPlayer.Name .. "!"
+User.TextColor3 = Color3.fromRGB(255, 255, 255)
+User.TextSize = 18
+User.Font = Enum.Font.GothamMedium
+User.TextXAlignment = Enum.TextXAlignment.Left
 User.Parent = Main
-
-local drg = Instance.new("Frame")
-drg.Name = "drg"
-drg.Size = UDim2.new(1.00, 0.00, 0.11, 0.00)
-drg.BorderColor3 = Color3.new(0.26, 0.26, 0.26)
-drg.Position = UDim2.new(0.00, 0.00, -0.00, 0.00)
-drg.BorderSizePixel = 0
-drg.ZIndex = 0
-drg.BackgroundColor3 = Color3.new(0.25, 0.25, 0.25)
-drg.Parent = Main
 
 local Profile = Instance.new("ImageLabel")
 Profile.Name = "Profile"
-Profile.BorderSizePixel = 0
-Profile.BackgroundColor3 = Color3.new(0.29, 0.29, 0.29)
-Profile.Image = Players:GetUserThumbnailAsync(ID, ThumbType, ThumbSize)
-Profile.Size = UDim2.new(0.09, 0.00, 0.11, 0.00)
-Profile.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-Profile.Position = UDim2.new(0.28, 0.00, 0.89, 0.00)
+Profile.Size = UDim2.new(0, 40, 0, 40)
+Profile.Position = UDim2.new(0, User.TextBounds.X + 15, 0.9, 0)
+Profile.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+Profile.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 Profile.Parent = Main
+
+local ProfileCorner = Instance.new("UICorner")
+ProfileCorner.CornerRadius = UDim.new(1, 0)
+ProfileCorner.Parent = Profile
 
 local function updateProfilePosition()
     Profile.Position = UDim2.new(0, User.TextBounds.X + 10, 0.89, 0)
@@ -93,62 +183,22 @@ end
 updateProfilePosition()
 User:GetPropertyChangedSignal("TextBounds"):Connect(updateProfilePosition)
 
-local uic2 = Instance.new("UICorner")
-uic2.Name = "uic2"
-uic2.CornerRadius = UDim.new(1.00, 1.00)
-uic2.Parent = Profile
-
-local yo_title____ = Instance.new("TextLabel")
-yo_title____.Name = "yo title?!?!"
-yo_title____.TextStrokeTransparency = 0
-yo_title____.BorderSizePixel = 0
-yo_title____.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-yo_title____.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-yo_title____.TextStrokeColor3 = Color3.new(1.00, 1.00, 1.00)
-yo_title____.TextSize = 35
-yo_title____.Size = UDim2.new(0.20, 200.00, 0.01, 50.00)
-yo_title____.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-yo_title____.Text = "gauntlet.lol (public release)"
-yo_title____.TextColor3 = Color3.new(0.98, 0.89, 0.21)
-yo_title____.BackgroundTransparency = 1
-yo_title____.Position = UDim2.new(0.19, 0.00, 0.00, 0.00)
-yo_title____.Parent = Main
-
-local uic = Instance.new("UICorner")
-uic.Name = "uic"
-uic.Parent = Main
-
-local log = Instance.new("TextLabel")
-log.Name = "log"
-log.TextWrapped = true
-log.BorderSizePixel = 0
-log.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-log.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
-log.TextSize = 40
-log.Size = UDim2.new(0.01, 200.00, 0.46, 50.00)
-log.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-log.Text = "changelog --------------------public release!"
-log.TextColor3 = Color3.new(1.00, 1.00, 1.00)
-log.BackgroundTransparency = 1
-log.Position = UDim2.new(0.31, 0.00, 0.18, 0.00)
-log.Parent = Main
 
 local VersionText = Instance.new("TextLabel")
 VersionText.Name = "VersionText"
-VersionText.BorderSizePixel = 0
+VersionText.Size = UDim2.new(0.2, 0, 0, 20)
+VersionText.Position = UDim2.new(0.78, 0, 0.93, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-VersionText.TextSize = 14
-VersionText.Size = UDim2.new(0.2, 0, 0.05, 0)
 VersionText.Text = "fetching version..."
 VersionText.TextColor3 = Color3.new(1, 1, 1)
 VersionText.TextTransparency = 0.7
-VersionText.Position = UDim2.new(0.8, 0, 0.95, 0)
+VersionText.TextSize = 14
+VersionText.Font = Enum.Font.Gotham
 VersionText.Parent = Main
 
 local function fetchVersion()
     if true then
-        VersionText.Text = "VERSION: 1.00b (release)"
+        VersionText.Text = "v1.01a"
     else
         VersionText.Text = "failed fetching version :("
     end
@@ -156,165 +206,163 @@ end
 
 fetchVersion()
 
-local miscB = Instance.new("TextButton")
-miscB.Name = "miscB"
-miscB.TextWrapped = true
-miscB.BorderSizePixel = 0
-miscB.TextScaled = true
-miscB.BackgroundColor3 = Color3.new(0.26, 0.26, 0.26)
-miscB.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-miscB.TextSize = 14
-miscB.Size = UDim2.new(0.14, 0.00, 0.10, 0.00)
-miscB.TextColor3 = Color3.new(1.00, 1.00, 1.00)
-miscB.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-miscB.Text = "Misc"
-miscB.Position = UDim2.new(-0.14, 0.00, 0.13, 0.00)
-miscB.Parent = Main
+local function createNavButton(name, posY)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "B"
+    button.Size = UDim2.new(0.14, 0, 0.08, 0)
+    button.Position = UDim2.new(-0.14, 0, posY, 0)
+    button.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    button.BorderSizePixel = 0
+    button.Text = name
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 16
+    button.Font = Enum.Font.GothamMedium
+    button.Parent = Main
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
+    
+    return button
+end
 
-local mainB = Instance.new("TextButton")
-mainB.Name = "mainB"
-mainB.TextWrapped = true
-mainB.BorderSizePixel = 0
-mainB.TextScaled = true
-mainB.BackgroundColor3 = Color3.new(0.26, 0.26, 0.26)
-mainB.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-mainB.TextSize = 14
-mainB.Size = UDim2.new(0.14, 0.00, 0.10, 0.00)
-mainB.TextColor3 = Color3.new(1.00, 1.00, 1.00)
-mainB.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-mainB.Text = "Main"
-mainB.Position = UDim2.new(-0.14, 0.00, 0.05, 0.00)
-mainB.Parent = Main
+local mainB = createNavButton("Main", 0.05)
+local miscB = createNavButton("Misc", 0.13)
+local homeB = createNavButton("Home", 0.21)
 
-local homeB = Instance.new("TextButton")
-homeB.Name = "homeB"
-homeB.TextWrapped = true
-homeB.BorderSizePixel = 0
-homeB.TextScaled = true
-homeB.BackgroundColor3 = Color3.new(0.26, 0.26, 0.26)
-homeB.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-homeB.TextSize = 14
-homeB.Size = UDim2.new(0.14, 0.00, 0.10, 0.00)
-homeB.TextColor3 = Color3.new(1.00, 1.00, 1.00)
-homeB.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-homeB.Text = "Home"
-homeB.Position = UDim2.new(-0.14, 0.00, 0.21, 0.00)
-homeB.Parent = Main
+local log = Instance.new("TextLabel")
+log.Name = "log"
+log.Size = UDim2.new(0.8, 0, 0.6, 0)
+log.Position = UDim2.new(0.1, 0, 0.2, 0)
+log.BackgroundTransparency = 1
+log.Text = "remade a little bit of ui, removed mobile support, and more!"
+log.TextColor3 = Color3.fromRGB(255, 255, 255)
+log.TextSize = 16
+log.Font = Enum.Font.GothamMedium
+log.TextWrapped = true
+log.Visible = false
+log.Parent = Main
 
 local FBool = Instance.new("TextLabel")
 FBool.Name = "FBool"
-FBool.BorderSizePixel = 0
-FBool.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-FBool.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
-FBool.TextSize = 25
-FBool.Size = UDim2.new(0.40, 0.00, 0.16, 0.00)
-FBool.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
-FBool.Text = "Fling Enabled?"
-FBool.TextColor3 = Color3.new(1.00, 1.00, 1.00)
+FBool.Size = UDim2.new(0.4, 0, 0.08, 0)
+FBool.Position = UDim2.new(0.07, 0, 0.18, 0)
 FBool.BackgroundTransparency = 1
-FBool.Position = UDim2.new(0.07, 0.00, 0.18, 0.00)
+FBool.Text = "Fling Enabled?"
+FBool.TextColor3 = Color3.fromRGB(255, 255, 255)
+FBool.TextSize = 18
+FBool.Font = Enum.Font.GothamBold
 FBool.Visible = false
 FBool.Parent = Main
 
+local FlingKeyLabel = Instance.new("TextLabel")
+FlingKeyLabel.Name = "FlingKeyLabel"
+FlingKeyLabel.Size = UDim2.new(0.4, 0, 0.08, 0)
+FlingKeyLabel.Position = UDim2.new(0.07, 0, 0.68, 0)
+FlingKeyLabel.BackgroundTransparency = 1
+FlingKeyLabel.Text = "Fling Key:"
+FlingKeyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlingKeyLabel.TextSize = 18
+FlingKeyLabel.Font = Enum.Font.GothamBold
+FlingKeyLabel.Visible = false
+FlingKeyLabel.Parent = Main
+
+local FlingKeyInput = Instance.new("TextBox")
+FlingKeyInput.Name = "FlingKeyInput"
+FlingKeyInput.Size = UDim2.new(0.15, 0, 0.08, 0)
+FlingKeyInput.Position = UDim2.new(0.48, 0, 0.68, 0)
+FlingKeyInput.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+FlingKeyInput.Text = "F"
+FlingKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlingKeyInput.TextSize = 16
+FlingKeyInput.Font = Enum.Font.GothamBold
+FlingKeyInput.Visible = false
+FlingKeyInput.Parent = Main
+
+local FlingKeyCorner = Instance.new("UICorner")
+FlingKeyCorner.CornerRadius = UDim.new(0, 8)
+FlingKeyCorner.Parent = FlingKeyInput
+
 local Checkorx = Instance.new("TextButton")
 Checkorx.Name = "Checkorx"
-Checkorx.BorderSizePixel = 0
-Checkorx.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-Checkorx.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-Checkorx.TextStrokeColor3 = Color3.new(1.00, 1.00, 1.00)
-Checkorx.TextSize = 20
-Checkorx.Size = UDim2.new(0.19, 0.00, 0.44, 0.00)
-Checkorx.TextColor3 = Color3.new(0.00, 0.00, 0.00)
-Checkorx.BorderColor3 = Color3.new(0.00, 0.00, 0.00)
+Checkorx.Size = UDim2.new(0.08, 0, 0.08, 0)
+Checkorx.Position = UDim2.new(0.48, 0, 0.18, 0)
+Checkorx.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 Checkorx.Text = "✅"
-Checkorx.BackgroundTransparency = 1
-Checkorx.Position = UDim2.new(0.81, 0.00, 0.30, 0.00)
+Checkorx.TextColor3 = Color3.fromRGB(255, 255, 255)
+Checkorx.TextSize = 16
+Checkorx.Font = Enum.Font.GothamBold
 Checkorx.Visible = false
-Checkorx.Parent = FBool
+Checkorx.Parent = Main
+
+local CheckorxCorner = Instance.new("UICorner")
+CheckorxCorner.CornerRadius = UDim.new(0, 8)
+CheckorxCorner.Parent = Checkorx
 
 local ForceSlider = Instance.new("Frame")
 ForceSlider.Name = "ForceSlider"
-ForceSlider.Size = UDim2.new(0.5, 0, 0.05, 0)
+ForceSlider.Size = UDim2.new(0.5, 0, 0.04, 0)
 ForceSlider.Position = UDim2.new(0.07, 0, 0.4, 0)
-ForceSlider.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+ForceSlider.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 ForceSlider.BorderSizePixel = 0
 ForceSlider.Visible = false
 ForceSlider.Parent = Main
+
+local SliderCorner = Instance.new("UICorner")
+SliderCorner.CornerRadius = UDim.new(1, 0)
+SliderCorner.Parent = ForceSlider
 
 local SliderKnob = Instance.new("Frame")
 SliderKnob.Name = "SliderKnob"
 SliderKnob.Size = UDim2.new(0.05, 0, 2, 0)
 SliderKnob.Position = UDim2.new(0, 0, -0.5, 0)
-SliderKnob.BackgroundColor3 = Color3.new(1, 1, 1)
+SliderKnob.BackgroundColor3 = Color3.fromRGB(250, 227, 54)
 SliderKnob.BorderSizePixel = 0
 SliderKnob.Parent = ForceSlider
 
+local KnobCorner = Instance.new("UICorner")
+KnobCorner.CornerRadius = UDim.new(1, 0)
+KnobCorner.Parent = SliderKnob
+
 local ForceLabel = Instance.new("TextLabel")
 ForceLabel.Name = "ForceLabel"
-ForceLabel.Size = UDim2.new(0.4, 0, 0.16, 0)
+ForceLabel.Size = UDim2.new(0.4, 0, 0.08, 0)
 ForceLabel.Position = UDim2.new(0.07, 0, 0.3, 0)
 ForceLabel.BackgroundTransparency = 1
-ForceLabel.Text = "Force: " .. tostring(force)
-ForceLabel.TextColor3 = Color3.new(1, 1, 1)
-ForceLabel.TextSize = 25
-ForceLabel.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json")
+ForceLabel.Text = "Force: 1000"
+ForceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ForceLabel.TextSize = 18
+ForceLabel.Font = Enum.Font.GothamMedium
 ForceLabel.Visible = false
 ForceLabel.Parent = Main
 
-local AutoClickerLabel = Instance.new("TextLabel")
-AutoClickerLabel.Name = "AutoClickerLabel"
-AutoClickerLabel.Size = UDim2.new(0.8, 0, 0.1, 0)
-AutoClickerLabel.Position = UDim2.new(0.1, 0, 0.3, 0)
-AutoClickerLabel.BackgroundTransparency = 1
-AutoClickerLabel.Text = "Autoclicker"
-AutoClickerLabel.TextColor3 = Color3.new(1, 1, 1)
-AutoClickerLabel.TextSize = 20
-AutoClickerLabel.Visible = false
-AutoClickerLabel.Parent = Main
+local TrajectoryToggle = Instance.new("TextLabel")
+TrajectoryToggle.Name = "TrajectoryToggle"
+TrajectoryToggle.Size = UDim2.new(0.4, 0, 0.08, 0)
+TrajectoryToggle.Position = UDim2.new(0.07, 0, 0.5, 0)
+TrajectoryToggle.BackgroundTransparency = 1
+TrajectoryToggle.Text = "Show Trajectory?"
+TrajectoryToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TrajectoryToggle.TextSize = 18
+TrajectoryToggle.Font = Enum.Font.GothamBold
+TrajectoryToggle.Visible = false
+TrajectoryToggle.Parent = Main
 
-local KeyInputsFrame = Instance.new("Frame")
-KeyInputsFrame.Name = "KeyInputsFrame"
-KeyInputsFrame.Size = UDim2.new(0.8, 0, 0.3, 0)
-KeyInputsFrame.Position = UDim2.new(0.1, 0, 0.45, 0)
-KeyInputsFrame.BackgroundTransparency = 1
-KeyInputsFrame.Visible = false
-KeyInputsFrame.Parent = Main
+local TrajectoryButton = Instance.new("TextButton")
+TrajectoryButton.Name = "TrajectoryButton"
+TrajectoryButton.Size = UDim2.new(0.08, 0, 0.08, 0)
+TrajectoryButton.Position = UDim2.new(0.48, 0, 0.5, 0)
+TrajectoryButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+TrajectoryButton.Text = "❌"
+TrajectoryButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TrajectoryButton.TextSize = 16
+TrajectoryButton.Font = Enum.Font.GothamBold
+TrajectoryButton.Visible = false
+TrajectoryButton.Parent = Main
 
-local OnKeyLabel = Instance.new("TextLabel")
-OnKeyLabel.Size = UDim2.new(0.45, 0, 0.3, 0)
-OnKeyLabel.Position = UDim2.new(0, 0, 0, 0)
-OnKeyLabel.BackgroundTransparency = 1
-OnKeyLabel.Text = "Toggle On Key:"
-OnKeyLabel.TextColor3 = Color3.new(1, 1, 1)
-OnKeyLabel.TextSize = 16
-OnKeyLabel.Parent = KeyInputsFrame
-
-local OffKeyLabel = Instance.new("TextLabel")
-OffKeyLabel.Size = UDim2.new(0.45, 0, 0.3, 0)
-OffKeyLabel.Position = UDim2.new(0.55, 0, 0, 0)
-OffKeyLabel.BackgroundTransparency = 1
-OffKeyLabel.Text = "Toggle Off Key:"
-OffKeyLabel.TextColor3 = Color3.new(1, 1, 1)
-OffKeyLabel.TextSize = 16
-OffKeyLabel.Parent = KeyInputsFrame
-
-local onKey = Instance.new("TextBox")
-onKey.Size = UDim2.new(0.45, 0, 0.3, 0)
-onKey.Position = UDim2.new(0, 0, 0.4, 0)
-onKey.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-onKey.Text = "Press any key"
-onKey.TextColor3 = Color3.new(1, 1, 1)
-onKey.TextSize = 16
-onKey.Parent = KeyInputsFrame
-
-local offKey = Instance.new("TextBox")
-offKey.Size = UDim2.new(0.45, 0, 0.3, 0)
-offKey.Position = UDim2.new(0.55, 0, 0.4, 0)
-offKey.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-offKey.Text = "Press any key"
-offKey.TextColor3 = Color3.new(1, 1, 1)
-offKey.TextSize = 16
-offKey.Parent = KeyInputsFrame
+local TrajectoryButtonCorner = Instance.new("UICorner")
+TrajectoryButtonCorner.CornerRadius = UDim.new(0, 8)
+TrajectoryButtonCorner.Parent = TrajectoryButton
 
 local MiscScrollingFrame = Instance.new("ScrollingFrame")
 MiscScrollingFrame.Name = "MiscScrollingFrame"
@@ -324,6 +372,7 @@ MiscScrollingFrame.BackgroundTransparency = 1
 MiscScrollingFrame.ScrollBarThickness = 4
 MiscScrollingFrame.Visible = false
 MiscScrollingFrame.Parent = Main
+MiscScrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
 
 local AntiAFKLabel = Instance.new("TextLabel")
 AntiAFKLabel.Name = "AntiAFKLabel"
@@ -331,93 +380,155 @@ AntiAFKLabel.Size = UDim2.new(0.8, 0, 0.1, 0)
 AntiAFKLabel.Position = UDim2.new(0.1, 0, 0, 0)
 AntiAFKLabel.BackgroundTransparency = 1
 AntiAFKLabel.Text = "Anti-AFK"
-AntiAFKLabel.TextColor3 = Color3.new(1, 1, 1)
-AntiAFKLabel.TextSize = 20
+AntiAFKLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiAFKLabel.TextSize = 18
+AntiAFKLabel.Font = Enum.Font.GothamBold
 AntiAFKLabel.Parent = MiscScrollingFrame
 
 local AntiAFKToggle = Instance.new("TextButton")
 AntiAFKToggle.Name = "AntiAFKToggle"
-AntiAFKToggle.Size = UDim2.new(0.2, 0, 0.1, 0)
-AntiAFKToggle.Position = UDim2.new(0.7, 0, 0, 0)
-AntiAFKToggle.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+AntiAFKToggle.Size = UDim2.new(0.15, 0, 0.1, 0)
+AntiAFKToggle.Position = UDim2.new(0.75, 0, 0, 0)
+AntiAFKToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 AntiAFKToggle.Text = "❌"
-AntiAFKToggle.TextColor3 = Color3.new(1, 1, 1)
-AntiAFKToggle.TextSize = 20
+AntiAFKToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiAFKToggle.TextSize = 16
+AntiAFKToggle.Font = Enum.Font.GothamBold
 AntiAFKToggle.Parent = MiscScrollingFrame
 
-AutoClickerLabel.Parent = MiscScrollingFrame
+local AntiAFKToggleCorner = Instance.new("UICorner")
+AntiAFKToggleCorner.CornerRadius = UDim.new(0, 8)
+AntiAFKToggleCorner.Parent = AntiAFKToggle
+
+local AutoClickerLabel = Instance.new("TextLabel")
+AutoClickerLabel.Name = "AutoClickerLabel"
+AutoClickerLabel.Size = UDim2.new(0.8, 0, 0.1, 0)
 AutoClickerLabel.Position = UDim2.new(0.1, 0, 0.15, 0)
-KeyInputsFrame.Parent = MiscScrollingFrame
-KeyInputsFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+AutoClickerLabel.BackgroundTransparency = 1
+AutoClickerLabel.Text = "Autoclicker"
+AutoClickerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoClickerLabel.TextSize = 18
+AutoClickerLabel.Font = Enum.Font.GothamBold
+AutoClickerLabel.Parent = MiscScrollingFrame
 
+local KeyInputsFrame = Instance.new("Frame")
+KeyInputsFrame.Name = "KeyInputsFrame"
+KeyInputsFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+KeyInputsFrame.Size = UDim2.fromScale(0.8, 0.3)
+KeyInputsFrame.Position = UDim2.fromScale(0.5, 0.45)
+KeyInputsFrame.BackgroundTransparency = 1
+KeyInputsFrame.Visible = false
+KeyInputsFrame.Parent = Main
 
-local TrajectoryToggle = Instance.new("TextLabel")
-TrajectoryToggle.Name = "TrajectoryToggle"
-TrajectoryToggle.BorderSizePixel = 0
-TrajectoryToggle.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-TrajectoryToggle.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Italic)
-TrajectoryToggle.TextSize = 25
-TrajectoryToggle.Size = UDim2.new(0.40, 0.00, 0.16, 0.00)
-TrajectoryToggle.Text = "Show Trajectory?"
-TrajectoryToggle.TextColor3 = Color3.new(1.00, 1.00, 1.00)
-TrajectoryToggle.BackgroundTransparency = 1
-TrajectoryToggle.Position = UDim2.new(0.07, 0.00, 0.5, 0.00)
-TrajectoryToggle.Visible = false
-TrajectoryToggle.Parent = Main
+local OnKeyLabel = Instance.new("TextLabel")
+OnKeyLabel.Size = UDim2.fromScale(0.45, 0.3)
+OnKeyLabel.Position = UDim2.fromScale(0, 0)
+OnKeyLabel.BackgroundTransparency = 1
+OnKeyLabel.Text = "Toggle On Key:"
+OnKeyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+OnKeyLabel.TextSize = 16
+OnKeyLabel.Font = Enum.Font.Gotham
+OnKeyLabel.Parent = KeyInputsFrame
 
-local TrajectoryButton = Instance.new("TextButton")
-TrajectoryButton.Name = "TrajectoryButton"
-TrajectoryButton.BorderSizePixel = 0
-TrajectoryButton.BackgroundColor3 = Color3.new(1.00, 1.00, 1.00)
-TrajectoryButton.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-TrajectoryButton.TextSize = 20
-TrajectoryButton.Size = UDim2.new(0.19, 0.00, 0.44, 0.00)
-TrajectoryButton.TextColor3 = Color3.new(0.00, 0.00, 0.00)
-TrajectoryButton.Text = "❌"
-TrajectoryButton.BackgroundTransparency = 1
-TrajectoryButton.Position = UDim2.new(0.81, 0.00, 0.62, 0.00)
-TrajectoryButton.Visible = false
-TrajectoryButton.Parent = TrajectoryToggle
+local OffKeyLabel = Instance.new("TextLabel")
+OffKeyLabel.Size = UDim2.fromScale(0.45, 0.3)
+OffKeyLabel.Position = UDim2.fromScale(0.55, 0)
+OffKeyLabel.BackgroundTransparency = 1
+OffKeyLabel.Text = "Toggle Off Key:"
+OffKeyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+OffKeyLabel.TextSize = 16
+OffKeyLabel.Font = Enum.Font.Gotham
+OffKeyLabel.Parent = KeyInputsFrame
 
-local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Name = "MinimizeButton"
-MinimizeButton.BackgroundTransparency = 1
-MinimizeButton.BorderSizePixel = 0
-MinimizeButton.BackgroundColor3 = Color3.new(1, 1, 1)
-MinimizeButton.Font = Enum.Font.SourceSansBold
-MinimizeButton.TextSize = 20
-MinimizeButton.Size = UDim2.new(0.1, 0, 0.1, 0)
-MinimizeButton.TextColor3 = Color3.new(255, 0, 0)
-MinimizeButton.Text = "-"
-MinimizeButton.Position = UDim2.new(0.9, 0, 0, 0)
-MinimizeButton.Parent = Main
+local onKey = Instance.new("TextBox")
+onKey.Size = UDim2.fromScale(0.45, 0.3)
+onKey.Position = UDim2.fromScale(0, 0.4)
+onKey.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+onKey.Text = "Press any key"
+onKey.TextColor3 = Color3.fromRGB(255, 255, 255)
+onKey.TextSize = 16
+onKey.Font = Enum.Font.Gotham
+onKey.BorderSizePixel = 0
+onKey.Parent = KeyInputsFrame
 
-local TouchKeyboard = Instance.new("Frame")
-TouchKeyboard.Name = "TouchKeyboard"
-TouchKeyboard.Size = UDim2.new(0.3, 0, 0.15, 0) 
-TouchKeyboard.Position = UDim2.new(0.35, 0, 0.8, 0)
-TouchKeyboard.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-TouchKeyboard.BackgroundTransparency = 0.5
-TouchKeyboard.Visible = isMobile
-TouchKeyboard.Parent = SG
+local offKey = Instance.new("TextBox")
+offKey.Size = UDim2.fromScale(0.45, 0.3)
+offKey.Position = UDim2.fromScale(0.55, 0.4)
+offKey.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+offKey.Text = "Press any key"
+offKey.TextColor3 = Color3.fromRGB(255, 255, 255)
+offKey.TextSize = 16
+offKey.Font = Enum.Font.Gotham
+offKey.BorderSizePixel = 0
+offKey.Parent = KeyInputsFrame
 
-MinimizeButton.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    isMinimized = true
-    StarterGui:SetCore("SendNotification", {
-    Title = "gauntlet.lol Info Message";
-    Text = "Press CTRL to open the GUI back up (G for mobile)";
-    Duration = 5;
-})
-end)
+local function updateMiscScrollingFrame()
+    AutoClickerLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
+    AutoClickerLabel.Position = UDim2.new(0.1, 0, 0.15, 0)
+    
+    local keyInputsContainer = Instance.new("Frame")
+    keyInputsContainer.Name = "KeyInputsContainer"
+    keyInputsContainer.Size = UDim2.new(1, 0, 0.3, 0)
+    keyInputsContainer.Position = UDim2.new(0, 0, 0.25, 0)
+    keyInputsContainer.BackgroundTransparency = 1
+    keyInputsContainer.Parent = MiscScrollingFrame
+    
+    OnKeyLabel.Size = UDim2.new(0.45, 0, 0.3, 0)
+    OnKeyLabel.Position = UDim2.new(0.1, 0, 0, 0)
+    OnKeyLabel.Parent = keyInputsContainer
+    
+    OffKeyLabel.Size = UDim2.new(0.45, 0, 0.3, 0)
+    OffKeyLabel.Position = UDim2.new(0.1, 0, 0.35, 0)
+    OffKeyLabel.Parent = keyInputsContainer
+    
+    onKey.Size = UDim2.new(0.3, 0, 0.25, 0)
+    onKey.Position = UDim2.new(0.6, 0, 0, 0)
+    onKey.Parent = keyInputsContainer
+    
+    offKey.Size = UDim2.new(0.3, 0, 0.25, 0)
+    offKey.Position = UDim2.new(0.6, 0, 0.35, 0)
+    offKey.Parent = keyInputsContainer
+    
+    AntiAFKLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
+    AntiAFKLabel.Position = UDim2.new(0.1, 0, 0, 0)
+    
+    AntiAFKToggle.Size = UDim2.new(0.15, 0, 0.08, 0)
+    AntiAFKToggle.Position = UDim2.new(0.75, 0, 0, 0)
+end
+
+local function animateToggle(button, enabled)
+    local rotation = enabled and 0 or 180
+    local finalText = enabled and "✅" or "❌"
+    
+    local rotateTween = TweenService:Create(button, 
+        TweenInfo.new(0.3, Enum.EasingStyle.Back), 
+        {Rotation = rotation}
+    )
+    
+    local bounceOut = TweenService:Create(button,
+        TweenInfo.new(0.15, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0.08, 0, 0.08, 0)}
+    )
+    
+    local bounceIn = TweenService:Create(button,
+        TweenInfo.new(0.15, Enum.EasingStyle.Bounce, Enum.EasingDirection.In),
+        {Size = UDim2.new(0.09, 0, 0.09, 0)}
+    )
+    
+    bounceIn:Play()
+    bounceIn.Completed:Wait()
+    rotateTween:Play()
+    wait(0.15)
+    button.Text = finalText
+    bounceOut:Play()
+end
 
 local function toggleCheckorx()
     local isChecked = Checkorx.Text == "✅"
-    local goal = { Rotation = isChecked and 180 or 0 }
-    TweenService:Create(Checkorx, TweenInfo.new(0.3), goal):Play()
-    wait(0.15)
-    Checkorx.Text = isChecked and "❌" or "✅"
+    animateToggle(Checkorx, not isChecked)
 end
+
+updateMiscScrollingFrame()
 
 local function toggleMainView()
     local isVisible = FBool.Visible
@@ -427,6 +538,8 @@ local function toggleMainView()
     ForceLabel.Visible = not isVisible
     TrajectoryToggle.Visible = not isVisible
     TrajectoryButton.Visible = not isVisible
+    FlingKeyLabel.Visible = not isVisible
+    FlingKeyInput.Visible = not isVisible
     log.Visible = false
     MiscScrollingFrame.Visible = false
     AutoClickerLabel.Visible = false
@@ -444,6 +557,8 @@ local function showChangelog()
     KeyInputsFrame.Visible = false
     TrajectoryToggle.Visible = false
     TrajectoryButton.Visible = false
+    FlingKeyLabel.Visible = false
+    FlingKeyInput.Visible = false
 end
 
 local function thingie()
@@ -457,7 +572,11 @@ local function thingie()
     KeyInputsFrame.Visible = true
     TrajectoryToggle.Visible = false
     TrajectoryButton.Visible = false
+    FlingKeyLabel.Visible = false
+    FlingKeyInput.Visible = false
 end
+
+showChangelog()
 
 Checkorx.MouseButton1Click:Connect(toggleCheckorx)
 mainB.MouseButton1Click:Connect(toggleMainView)
@@ -473,7 +592,7 @@ local function update(input)
     Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + (input.Position - dragStart).X, startPos.Y.Scale, startPos.Y.Offset + (input.Position - dragStart).Y)
 end
 
-drg.InputBegan:Connect(function(input)
+TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging, dragStart, startPos = true, input.Position, Main.Position
         input.Changed:Connect(function()
@@ -482,7 +601,7 @@ drg.InputBegan:Connect(function(input)
     end
 end)
 
-drg.InputChanged:Connect(function(input)
+TopBar.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
@@ -527,8 +646,22 @@ SliderKnob.InputBegan:Connect(function(input)
     end
 end)
 
+local currentFlingKey = Enum.KeyCode.F
+
+FlingKeyInput.Focused:Connect(function()
+    local connection
+    connection = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            currentFlingKey = input.KeyCode
+            FlingKeyInput.Text = input.KeyCode.Name
+            FlingKeyInput:ReleaseFocus()
+            connection:Disconnect()
+        end
+    end)
+end)
+
 UserInputService.InputBegan:Connect(function(key, processed)
-    if key.KeyCode == Enum.KeyCode.F and not processed then
+    if key.KeyCode == currentFlingKey and not processed then
         if Checkorx.Text == "✅" then
             local char = LocalPlayer.Character
             if char then
@@ -760,139 +893,5 @@ Players.PlayerRemoving:Connect(function(player)
     if player == LocalPlayer then
         trajectoryUpdateConnection:Disconnect()
         TrajectoryFolder:Destroy()
-    end
-end)
-
-local function mobileFling()
-    if Checkorx.Text == "✅" then
-        local char = LocalPlayer.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local camera = workspace.CurrentCamera
-                local dir = (camera.CFrame.Position - root.Position).Unit
-                
-                local bv = Instance.new("BodyVelocity")
-                bv.Velocity = dir * force
-                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bv.P = 10000
-                bv.Parent = root
-                
-                local bav = Instance.new("BodyAngularVelocity")
-                bav.AngularVelocity = Vector3.new(math.random(-5, 5), math.random(-5, 5), math.random(-5, 5)) * 5
-                bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                bav.P = 10000
-                bav.Parent = root
-                
-                game:GetService("Debris"):AddItem(bv, 0.1)
-                game:GetService("Debris"):AddItem(bav, 0.1)
-            end
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    
-    if (isMobile and input.KeyCode == Enum.KeyCode.G) or
-       (not isMobile and input.KeyCode == Enum.KeyCode.LeftControl) then
-        if isMinimized then
-            isMinimized = false
-            Main.Visible = true
-        end
-    end
-    
-    if input.KeyCode == Enum.KeyCode.F then
-        mobileFling()
-    elseif input.UserInputType == Enum.UserInputType.Touch then
-        lastTouchPosition = input.Position
-        mobileFling()
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        lastTouchPosition = nil
-    end
-end)
-
-local isDraggingKeyboard = false
-local keyboardDragStart = nil
-local keyboardStartPos = nil
-
-local function updateKeyboardPosition(input)
-    local delta = input.Position - keyboardDragStart
-    TouchKeyboard.Position = UDim2.new(
-        keyboardStartPos.X.Scale, 
-        keyboardStartPos.X.Offset + delta.X,
-        keyboardStartPos.Y.Scale,
-        keyboardStartPos.Y.Offset + delta.Y
-    )
-end
-
-local function createTouchButton(text, position)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0.45, 0, 0.8, 0)
-    button.Position = position
-    button.Text = text
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    button.TextSize = 18
-    button.Parent = TouchKeyboard
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0.1, 0)
-    corner.Parent = button
-    
-    button.MouseButton1Down:Connect(function()
-        button.BackgroundColor3 = Color3.new(0.4, 0.4, 0.4)
-    end)
-    
-    button.MouseButton1Up:Connect(function()
-        button.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    end)
-    
-    return button
-end
-
-local dragHandle = Instance.new("Frame")
-dragHandle.Size = UDim2.new(1, 0, 0.2, 0)
-dragHandle.Position = UDim2.new(0, 0, -0.2, 0)
-dragHandle.BackgroundColor3 = Color3.new(0.25, 0.25, 0.25)
-dragHandle.BackgroundTransparency = 0.3
-dragHandle.Parent = TouchKeyboard
-
-local handleCorner = Instance.new("UICorner")
-handleCorner.CornerRadius = UDim.new(0.2, 0)
-handleCorner.Parent = dragHandle
-
-dragHandle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingKeyboard = true
-        keyboardDragStart = input.Position
-        keyboardStartPos = TouchKeyboard.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                isDraggingKeyboard = false
-            end
-        end)
-    end
-end)
-
-dragHandle.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch and isDraggingKeyboard then
-        updateKeyboardPosition(input)
-    end
-end)
-
-local flingButton = createTouchButton("Fling (F)", UDim2.new(0.025, 0, 0.1, 0))
-local toggleButton = createTouchButton("Toggle (G)", UDim2.new(0.525, 0, 0.1, 0))
-
-flingButton.MouseButton1Click:Connect(mobileFling)
-toggleButton.MouseButton1Click:Connect(function()
-    if isMinimized then
-        isMinimized = false
-        Main.Visible = true
     end
 end)
