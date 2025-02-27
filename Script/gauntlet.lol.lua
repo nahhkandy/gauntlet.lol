@@ -5,8 +5,11 @@ local Players = cref(game:GetService("Players"))
 local TweenService = cref(game:GetService("TweenService"))
 local UserInputService = cref(game:GetService("UserInputService"))
 local RunService = cref(game:GetService("RunService"))
-local HttpService = cref(game:GetService("HttpService"))
+local ReplicatedStorage = cref(game:GetService("ReplicatedStorage"))
 local LocalPlayer = Players.LocalPlayer
+local stealthMode = false
+local guiVisibleBeforeStealth = true
+local mapTable = {"bfur", "Line"} -- change, worst maps for cheating (imo)
 
 local TrajectoryFolder = Instance.new("Folder")
 TrajectoryFolder.Name = "TrajectoryViewer"
@@ -235,7 +238,7 @@ log.Name = "log"
 log.Size = UDim2.new(0.8, 0, 0.6, 0)
 log.Position = UDim2.new(0.1, 0, 0.2, 0)
 log.BackgroundTransparency = 1
-log.Text = "remade a little bit of ui, removed mobile support, and more!"
+log.Text = "stealth mode (for streaming) and auto voting!"
 log.TextColor3 = Color3.fromRGB(255, 255, 255)
 log.TextSize = 16
 log.Font = Enum.Font.GothamMedium
@@ -462,6 +465,50 @@ offKey.Font = Enum.Font.Gotham
 offKey.BorderSizePixel = 0
 offKey.Parent = KeyInputsFrame
 
+local StealthButton = Instance.new("TextButton")
+StealthButton.Name = "StealthButton"
+StealthButton.Size = UDim2.new(0, 30, 0, 30)
+StealthButton.Position = UDim2.new(0.92, 0, 0.5, -15)
+StealthButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+StealthButton.Text = "👁️"
+StealthButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+StealthButton.TextSize = 16
+StealthButton.Font = Enum.Font.GothamBold
+StealthButton.Parent = TopBar
+
+local StealthButtonCorner = Instance.new("UICorner")
+StealthButtonCorner.CornerRadius = UDim.new(0, 8)
+StealthButtonCorner.Parent = StealthButton
+
+
+local StealthKeyLabel = Instance.new("TextLabel")
+StealthKeyLabel.Name = "StealthKeyLabel"
+StealthKeyLabel.Size = UDim2.new(0.4, 0, 0.08, 0)
+StealthKeyLabel.Position = UDim2.new(0.07, 0, 0.78, 0)
+StealthKeyLabel.BackgroundTransparency = 1
+StealthKeyLabel.Text = "Stealth Mode Key:"
+StealthKeyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+StealthKeyLabel.TextSize = 18
+StealthKeyLabel.Font = Enum.Font.GothamBold
+StealthKeyLabel.Visible = false
+StealthKeyLabel.Parent = Main
+
+local StealthKeyInput = Instance.new("TextBox")
+StealthKeyInput.Name = "StealthKeyInput"
+StealthKeyInput.Size = UDim2.new(0.15, 0, 0.08, 0)
+StealthKeyInput.Position = UDim2.new(0.48, 0, 0.78, 0)
+StealthKeyInput.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+StealthKeyInput.Text = "X"
+StealthKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+StealthKeyInput.TextSize = 16
+StealthKeyInput.Font = Enum.Font.GothamBold
+StealthKeyInput.Visible = false
+StealthKeyInput.Parent = Main
+
+local StealthKeyCorner = Instance.new("UICorner")
+StealthKeyCorner.CornerRadius = UDim.new(0, 8)
+StealthKeyCorner.Parent = StealthKeyInput
+
 local function updateMiscScrollingFrame()
     AutoClickerLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
     AutoClickerLabel.Position = UDim2.new(0.1, 0, 0.15, 0)
@@ -544,6 +591,8 @@ local function toggleMainView()
     MiscScrollingFrame.Visible = false
     AutoClickerLabel.Visible = false
     KeyInputsFrame.Visible = false
+    StealthKeyLabel.Visible = isVisible
+    StealthKeyInput.Visible = isVisible
 end
 
 local function showChangelog()
@@ -559,6 +608,8 @@ local function showChangelog()
     TrajectoryButton.Visible = false
     FlingKeyLabel.Visible = false
     FlingKeyInput.Visible = false
+    StealthKeyLabel.Visible = false
+    StealthKeyInput.Visible = false
 end
 
 local function thingie()
@@ -574,6 +625,79 @@ local function thingie()
     TrajectoryButton.Visible = false
     FlingKeyLabel.Visible = false
     FlingKeyInput.Visible = false
+    StealthKeyLabel.Visible = false
+    StealthKeyInput.Visible = false
+end
+
+local function toggleStealthMode()
+    stealthMode = not stealthMode
+    
+    if stealthMode then
+        guiVisibleBeforeStealth = Main.Visible
+        
+        local fadeOut = TweenService:Create(
+            Main, 
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {BackgroundTransparency = 1}
+        )
+        
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+        Main.Visible = false
+        
+        local indicator = Instance.new("Frame")
+        indicator.Name = "StealthIndicator"
+        indicator.Size = UDim2.new(0, 10, 0, 10)
+        indicator.Position = UDim2.new(1, -15, 0, 5)
+        indicator.BackgroundColor3 = Color3.fromRGB(250, 227, 54)
+        indicator.BorderSizePixel = 0
+        indicator.Parent = SG
+        
+        local indicatorCorner = Instance.new("UICorner")
+        indicatorCorner.CornerRadius = UDim.new(1, 0)
+        indicatorCorner.Parent = indicator
+        
+        task.spawn(function()
+            while stealthMode and indicator and indicator.Parent do
+                local pulseTween = TweenService:Create(
+                    indicator,
+                    TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                    {Transparency = 0.7}
+                )
+                pulseTween:Play()
+                wait(1)
+                
+                if not stealthMode then break end
+                
+                local pulseTweenBack = TweenService:Create(
+                    indicator,
+                    TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                    {Transparency = 0}
+                )
+                pulseTweenBack:Play()
+                wait(1)
+            end
+        end)
+        
+        StealthButton.Text = "⚪"
+    else
+        local indicator = SG:FindFirstChild("StealthIndicator")
+        if indicator then
+            indicator:Destroy()
+        end
+        
+        Main.BackgroundTransparency = 1
+        Main.Visible = guiVisibleBeforeStealth
+        
+        local fadeIn = TweenService:Create(
+            Main, 
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {BackgroundTransparency = 0}
+        )
+        
+        fadeIn:Play()
+        StealthButton.Text = "👁️"
+    end
 end
 
 showChangelog()
@@ -582,6 +706,7 @@ Checkorx.MouseButton1Click:Connect(toggleCheckorx)
 mainB.MouseButton1Click:Connect(toggleMainView)
 homeB.MouseButton1Click:Connect(showChangelog)
 miscB.MouseButton1Click:Connect(thingie)
+StealthButton.MouseButton1Click:Connect(toggleStealthMode)
 
 local dragging
 local dragInput
@@ -895,3 +1020,61 @@ Players.PlayerRemoving:Connect(function(player)
         TrajectoryFolder:Destroy()
     end
 end)
+
+local currentStealthKey = Enum.KeyCode.X
+
+StealthKeyInput.Focused:Connect(function()
+    local connection
+    connection = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            currentStealthKey = input.KeyCode
+            StealthKeyInput.Text = input.KeyCode.Name
+            StealthKeyInput:ReleaseFocus()
+            connection:Disconnect()
+        end
+    end)
+end)
+
+UserInputService.InputBegan:Connect(function(key, processed)
+    if key.KeyCode == currentStealthKey and not processed then
+        toggleStealthMode()
+    end
+end)
+
+
+local function autoVote()
+    local currentTime = tick()
+    local timeRemaining = lastVoteTime + cooldownDuration - currentTime
+    
+    if timeRemaining > 0 then
+        notify("Auto Vote", string.format("You can't auto-vote until %.1f seconds.", timeRemaining), "error", 3)
+        return
+    end
+    
+    local connection
+    connection = game:GetService("LogService").MessageOut:Connect(function(message)
+        for _, map in ipairs(mapTable) do
+            local pattern = "(" .. map .. ")__"
+            if message:find(pattern) then
+                local nextMapIndex
+                for i, currentMap in ipairs(mapTable) do
+                    if currentMap == map then
+                        nextMapIndex = i % #mapTable + 1
+                        break
+                    end
+                end
+                
+                ReplicatedStorage.ClientVoteToChangeMap:FireServer()
+                notify("Auto Vote", 'Automatically voted or already voted.', "info", 3)
+                
+                connection:Disconnect()
+                break
+            end
+        end
+    end)
+end
+
+while true do
+    task.wait(5)
+    autoVote()
+end
