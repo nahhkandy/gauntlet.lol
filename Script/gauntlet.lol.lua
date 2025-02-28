@@ -201,7 +201,7 @@ VersionText.Parent = Main
 
 local function fetchVersion()
     if true then
-        VersionText.Text = "v1.01a"
+        VersionText.Text = "v1.01b"
     else
         VersionText.Text = "failed fetching version :("
     end
@@ -1043,14 +1043,6 @@ end)
 
 
 local function autoVote()
-    local currentTime = tick()
-    local timeRemaining = lastVoteTime + cooldownDuration - currentTime
-    
-    if timeRemaining > 0 then
-        notify("Auto Vote", string.format("You can't auto-vote until %.1f seconds.", timeRemaining), "error", 3)
-        return
-    end
-    
     local connection
     connection = game:GetService("LogService").MessageOut:Connect(function(message)
         for _, map in ipairs(mapTable) do
