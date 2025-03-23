@@ -10,6 +10,12 @@ local LocalPlayer = Players.LocalPlayer
 local stealthMode = false
 local guiVisibleBeforeStealth = true
 local mapTable = {"bfur", "Line"} -- change, worst maps for cheating (imo)
+local isDarkTheme = true
+local notificationQueue = {}
+local isProcessingQueue = false
+local debugMode = false
+local debugLogs = {}
+local maxDebugLogs = 100
 
 local TrajectoryFolder = Instance.new("Folder")
 TrajectoryFolder.Name = "TrajectoryViewer"
@@ -21,86 +27,124 @@ SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 SG.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local function notify(title, message, type, duration)
-    duration = duration or 5
-
+local function processNotificationQueue()
+    if #notificationQueue == 0 then
+        isProcessingQueue = false
+        return
+    end
+    
+    isProcessingQueue = true
+    local notificationData = table.remove(notificationQueue, 1)
+    
     local notification = Instance.new("Frame")
     notification.Size = UDim2.new(0, 300, 0, 80)
     notification.Position = UDim2.new(1, 20, 1, -100)
     notification.BackgroundTransparency = 0.1
     notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     notification.Parent = SG
-
+    
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = notification
-
+    
     local sideBar = Instance.new("Frame")
     sideBar.Size = UDim2.new(0, 4, 1, 0)
     sideBar.Position = UDim2.new(0, 0, 0, 0)
     sideBar.BorderSizePixel = 0
     sideBar.Parent = notification
-
+    
     local typeColors = {
         error = Color3.fromRGB(255, 64, 64),
         info = Color3.fromRGB(64, 156, 255),
         warning = Color3.fromRGB(255, 164, 64),
         success = Color3.fromRGB(64, 255, 128)
     }
-    sideBar.BackgroundColor3 = typeColors[type] or Color3.fromRGB(200, 200, 200)
-
+    sideBar.BackgroundColor3 = typeColors[notificationData.type] or Color3.fromRGB(200, 200, 200)
+    
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -20, 0, 25)
     titleLabel.Position = UDim2.new(0, 15, 0, 5)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
+    titleLabel.Text = notificationData.title
     titleLabel.TextColor3 = Color3.new(1, 1, 1)
     titleLabel.TextSize = 18
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = notification
-
+    
     local messageLabel = Instance.new("TextLabel")
     messageLabel.Size = UDim2.new(1, -20, 0, 40)
     messageLabel.Position = UDim2.new(0, 15, 0, 35)
     messageLabel.BackgroundTransparency = 1
-    messageLabel.Text = message
+    messageLabel.Text = notificationData.message
     messageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     messageLabel.TextSize = 14
     messageLabel.Font = Enum.Font.Gotham
     messageLabel.TextXAlignment = Enum.TextXAlignment.Left
     messageLabel.TextWrapped = true
     messageLabel.Parent = notification
-
+    
+    local textSize = game:GetService("TextService"):GetTextSize(
+        notificationData.message,
+        messageLabel.TextSize,
+        messageLabel.Font,
+        Vector2.new(280, 1000)
+    )
+    
+    local additionalHeight = math.max(0, textSize.Y - 40)
+    if additionalHeight > 0 then
+        notification.Size = UDim2.new(0, 300, 0, 80 + additionalHeight)
+    end
+    
+    messageLabel.Size = UDim2.new(1, -20, 0, 40 + additionalHeight)
+    
     local progressBar = Instance.new("Frame")
     progressBar.Size = UDim2.new(0, 0, 0, 4)
     progressBar.Position = UDim2.new(0, 0, 1, -4)
     progressBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     progressBar.BorderSizePixel = 0
     progressBar.Parent = notification
-
+    
     local progressCorner = Instance.new("UICorner")
     progressCorner.CornerRadius = UDim.new(1, 0)
     progressCorner.Parent = progressBar
-
+    
     local sound = Instance.new("Sound")
     sound.SoundId = "rbxassetid://6026984224"
     sound.Volume = 1
     sound.Parent = notification
     sound:Play()
-
+    
     local tweenIn = TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(1, -320, 1, -100)})
     tweenIn:Play()
-
-    local progressTween = TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 4)})
+    
+    local progressTween = TweenService:Create(progressBar, TweenInfo.new(notificationData.duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 4)})
     progressTween:Play()
-
-    task.delay(duration, function()
+    
+    task.delay(notificationData.duration, function()
         local fadeOut = TweenService:Create(notification, TweenInfo.new(0.3), {Position = UDim2.new(1, 20, 1, -100)})
         fadeOut:Play()
         fadeOut.Completed:Wait()
         notification:Destroy()
+        
+        task.spawn(processNotificationQueue)
     end)
+end
+
+
+local function notify(title, message, type, duration)
+    duration = duration or 5
+    
+    table.insert(notificationQueue, {
+        title = title,
+        message = message,
+        type = type,
+        duration = duration
+    })
+    
+    if not isProcessingQueue then
+        processNotificationQueue()
+    end
 end
 
 if _G.GauntletLoaded then
@@ -201,7 +245,7 @@ VersionText.Parent = Main
 
 local function fetchVersion()
     if true then
-        VersionText.Text = "v1.01b"
+        VersionText.Text = "v1.10a"
     else
         VersionText.Text = "failed fetching version :("
     end
@@ -232,13 +276,15 @@ end
 local mainB = createNavButton("Main", 0.05)
 local miscB = createNavButton("Misc", 0.13)
 local homeB = createNavButton("Home", 0.21)
+local logB = createNavButton("Logs", 0.29)
+local settingsB = createNavButton("Settings", 0.37)
 
 local log = Instance.new("TextLabel")
 log.Name = "log"
 log.Size = UDim2.new(0.8, 0, 0.6, 0)
 log.Position = UDim2.new(0.1, 0, 0.2, 0)
 log.BackgroundTransparency = 1
-log.Text = "stealth mode (for streaming) and auto voting!"
+log.Text = "a lot"
 log.TextColor3 = Color3.fromRGB(255, 255, 255)
 log.TextSize = 16
 log.Font = Enum.Font.GothamMedium
@@ -509,6 +555,333 @@ local StealthKeyCorner = Instance.new("UICorner")
 StealthKeyCorner.CornerRadius = UDim.new(0, 8)
 StealthKeyCorner.Parent = StealthKeyInput
 
+local ThemeButton = Instance.new("TextButton")
+ThemeButton.Name = "ThemeButton"
+ThemeButton.Size = UDim2.new(0, 30, 0, 30)
+ThemeButton.Position = UDim2.new(0.82, 0, 0.5, -15)
+ThemeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+ThemeButton.Text = "🌙"
+ThemeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ThemeButton.TextSize = 16
+ThemeButton.Font = Enum.Font.GothamBold
+ThemeButton.Parent = TopBar
+
+local ThemeButtonCorner = Instance.new("UICorner")
+ThemeButtonCorner.CornerRadius = UDim.new(0, 8)
+ThemeButtonCorner.Parent = ThemeButton
+
+local LogsFrame = Instance.new("ScrollingFrame")
+LogsFrame.Name = "LogsFrame"
+LogsFrame.Size = UDim2.new(0.8, 0, 0.7, 0)
+LogsFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+LogsFrame.BackgroundTransparency = 1
+LogsFrame.ScrollBarThickness = 4
+LogsFrame.Visible = false
+LogsFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+LogsFrame.Parent = Main
+
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Name = "SettingsFrame"
+SettingsFrame.Size = UDim2.new(0.8, 0, 0.7, 0)
+SettingsFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+SettingsFrame.BackgroundTransparency = 1
+SettingsFrame.Visible = false
+SettingsFrame.Parent = Main
+
+local SaveSettingsButton = Instance.new("TextButton")
+SaveSettingsButton.Name = "SaveSettingsButton"
+SaveSettingsButton.Size = UDim2.new(0.3, 0, 0.08, 0)
+SaveSettingsButton.Position = UDim2.new(0.35, 0, 0.85, 0)
+SaveSettingsButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+SaveSettingsButton.Text = "Save Settings"
+SaveSettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveSettingsButton.TextSize = 16
+SaveSettingsButton.Font = Enum.Font.GothamBold
+SaveSettingsButton.Parent = SettingsFrame
+
+local SaveButtonCorner = Instance.new("UICorner")
+SaveButtonCorner.CornerRadius = UDim.new(0, 8)
+SaveButtonCorner.Parent = SaveSettingsButton
+
+local ResetSettingsButton = Instance.new("TextButton")
+ResetSettingsButton.Name = "ResetSettingsButton"
+ResetSettingsButton.Size = UDim2.new(0.2, 0, 0.06, 0)
+ResetSettingsButton.Position = UDim2.new(0.4, 0, 0.75, 0)
+ResetSettingsButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+ResetSettingsButton.Text = "Reset"
+ResetSettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResetSettingsButton.TextSize = 14
+ResetSettingsButton.Font = Enum.Font.GothamBold
+ResetSettingsButton.Parent = SettingsFrame
+
+local ResetButtonCorner = Instance.new("UICorner")
+ResetButtonCorner.CornerRadius = UDim.new(0, 8)
+ResetButtonCorner.Parent = ResetSettingsButton
+
+local MapsButton = Instance.new("TextButton")
+MapsButton.Name = "MapsButton"
+MapsButton.Size = UDim2.new(0, 30, 0, 30)
+MapsButton.Position = UDim2.new(0.72, 0, 0.5, -15)
+MapsButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+MapsButton.Text = "🗺️"
+MapsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MapsButton.TextSize = 16
+MapsButton.Font = Enum.Font.GothamBold
+MapsButton.Parent = TopBar
+
+local MapsButtonCorner = Instance.new("UICorner")
+MapsButtonCorner.CornerRadius = UDim.new(0, 8)
+MapsButtonCorner.Parent = MapsButton
+
+local MapSelectionFrame = Instance.new("Frame")
+MapSelectionFrame.Name = "MapSelectionFrame"
+MapSelectionFrame.Size = UDim2.new(0.8, 0, 0.7, 0)
+MapSelectionFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MapSelectionFrame.BackgroundTransparency = 1
+MapSelectionFrame.Visible = false
+MapSelectionFrame.Parent = Main
+
+local MapSelectionHeading = Instance.new("TextLabel")
+MapSelectionHeading.Name = "MapSelectionHeading"
+MapSelectionHeading.Size = UDim2.new(1, 0, 0.1, 0)
+MapSelectionHeading.Position = UDim2.new(0, 0, 0, 0)
+MapSelectionHeading.BackgroundTransparency = 1
+MapSelectionHeading.Text = "Map Configuration"
+MapSelectionHeading.TextColor3 = Color3.fromRGB(255, 255, 255)
+MapSelectionHeading.TextSize = 20
+MapSelectionHeading.Font = Enum.Font.GothamBold
+MapSelectionHeading.Parent = MapSelectionFrame
+
+local MapScrollFrame = Instance.new("ScrollingFrame")
+MapScrollFrame.Name = "MapScrollFrame"
+MapScrollFrame.Size = UDim2.new(0.9, 0, 0.8, 0)
+MapScrollFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
+MapScrollFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+MapScrollFrame.BorderSizePixel = 0
+MapScrollFrame.ScrollBarThickness = 4
+MapScrollFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+MapScrollFrame.Parent = MapSelectionFrame
+
+local MapScrollCorner = Instance.new("UICorner")
+MapScrollCorner.CornerRadius = UDim.new(0, 8)
+MapScrollCorner.Parent = MapScrollFrame
+
+local DebugToggleLabel = Instance.new("TextLabel")
+DebugToggleLabel.Name = "DebugToggleLabel"
+DebugToggleLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
+DebugToggleLabel.Position = UDim2.new(0.1, 0, 0.1, 0)
+DebugToggleLabel.BackgroundTransparency = 1
+DebugToggleLabel.Text = "Debug Mode"
+DebugToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+DebugToggleLabel.TextSize = 18
+DebugToggleLabel.Font = Enum.Font.GothamBold
+DebugToggleLabel.Parent = SettingsFrame
+
+local DebugToggle = Instance.new("TextButton")
+DebugToggle.Name = "DebugToggle"
+DebugToggle.Size = UDim2.new(0.15, 0, 0.08, 0)
+DebugToggle.Position = UDim2.new(0.75, 0, 0.1, 0)
+DebugToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+DebugToggle.Text = "❌"
+DebugToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+DebugToggle.TextSize = 16
+DebugToggle.Font = Enum.Font.GothamBold
+DebugToggle.Parent = SettingsFrame
+
+local DebugToggleCorner = Instance.new("UICorner")
+DebugToggleCorner.CornerRadius = UDim.new(0, 8)
+DebugToggleCorner.Parent = DebugToggle
+
+local PerformanceToggleLabel = Instance.new("TextLabel")
+PerformanceToggleLabel.Name = "PerformanceToggleLabel"
+PerformanceToggleLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
+PerformanceToggleLabel.Position = UDim2.new(0.1, 0, 0.2, 0)
+PerformanceToggleLabel.BackgroundTransparency = 1
+PerformanceToggleLabel.Text = "Performance Mode"
+PerformanceToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PerformanceToggleLabel.TextSize = 18
+PerformanceToggleLabel.Font = Enum.Font.GothamBold
+PerformanceToggleLabel.Parent = SettingsFrame
+
+local PerformanceToggle = Instance.new("TextButton")
+PerformanceToggle.Name = "PerformanceToggle"
+PerformanceToggle.Size = UDim2.new(0.15, 0, 0.08, 0)
+PerformanceToggle.Position = UDim2.new(0.75, 0, 0.2, 0)
+PerformanceToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+PerformanceToggle.Text = "❌"
+PerformanceToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PerformanceToggle.TextSize = 16
+PerformanceToggle.Font = Enum.Font.GothamBold
+PerformanceToggle.Parent = SettingsFrame
+
+local PerformanceToggleCorner = Instance.new("UICorner")
+PerformanceToggleCorner.CornerRadius = UDim.new(0, 8)
+PerformanceToggleCorner.Parent = PerformanceToggle
+
+local HelpButton = Instance.new("TextButton")
+HelpButton.Name = "HelpButton"
+HelpButton.Size = UDim2.new(0, 30, 0, 30)
+HelpButton.Position = UDim2.new(0.62, 0, 0.5, -15)
+HelpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+HelpButton.Text = "❓"
+HelpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+HelpButton.TextSize = 16
+HelpButton.Font = Enum.Font.GothamBold
+HelpButton.Parent = TopBar
+
+local HelpButtonCorner = Instance.new("UICorner")
+HelpButtonCorner.CornerRadius = UDim.new(0, 8)
+HelpButtonCorner.Parent = HelpButton
+
+
+local themes = {
+    dark = {
+        main = Color3.fromRGB(30, 30, 35),
+        topBar = Color3.fromRGB(40, 40, 45),
+        elements = Color3.fromRGB(45, 45, 50),
+        text = Color3.fromRGB(255, 255, 255),
+		title = Color3.fromRGB(250, 227, 54)
+        subText = Color3.fromRGB(200, 200, 200)
+    },
+    light = {
+        main = Color3.fromRGB(240, 240, 245),
+        topBar = Color3.fromRGB(225, 225, 230),
+        elements = Color3.fromRGB(210, 210, 215),
+        text = Color3.fromRGB(40, 40, 45),
+        subText = Color3.fromRGB(80, 80, 85)
+    }
+}
+
+local function applyTheme(theme)
+    Main.BackgroundColor3 = theme.main
+    TopBar.BackgroundColor3 = theme.topBar
+    
+    Title.TextColor3 = theme.title
+    User.TextColor3 = theme.text
+    VersionText.TextColor3 = theme.text
+    VersionText.TextTransparency = isDarkTheme and 0.7 or 0.5
+    
+    for _, button in ipairs({mainB, miscB, homeB}) do
+        button.BackgroundColor3 = theme.elements
+        button.TextColor3 = theme.text
+    end
+    
+    for _, instance in ipairs({
+        Checkorx, ForceSlider, SliderKnob, TrajectoryButton, 
+        FlingKeyInput, StealthKeyInput, StealthButton, ThemeButton,
+        onKey, offKey
+    }) do
+        if instance:IsA("TextButton") or instance:IsA("TextBox") then
+            instance.BackgroundColor3 = theme.elements
+            instance.TextColor3 = theme.text
+        elseif instance:IsA("Frame") then
+            instance.BackgroundColor3 = theme.elements
+        end
+    end
+    
+    for _, label in ipairs({
+        FBool, ForceLabel, TrajectoryToggle, FlingKeyLabel, 
+        StealthKeyLabel, log, AntiAFKLabel, AutoClickerLabel,
+        OnKeyLabel, OffKeyLabel
+    }) do
+        label.TextColor3 = theme.text
+    end
+    
+    SliderKnob.BackgroundColor3 = Color3.fromRGB(250, 227, 54)
+    
+    if MiscScrollingFrame then
+        for _, child in ipairs(MiscScrollingFrame:GetChildren()) do
+            if child:IsA("TextButton") or child:IsA("TextBox") then
+                child.BackgroundColor3 = theme.elements
+                child.TextColor3 = theme.text
+            elseif child:IsA("TextLabel") then
+                child.TextColor3 = theme.text
+            elseif child:IsA("Frame") then
+                child.BackgroundColor3 = theme.elements
+                for _, frameChild in ipairs(child:GetChildren()) do
+                    if frameChild:IsA("TextButton") or frameChild:IsA("TextBox") then
+                        frameChild.BackgroundColor3 = theme.elements
+                        frameChild.TextColor3 = theme.text
+                    elseif frameChild:IsA("TextLabel") then
+                        frameChild.TextColor3 = theme.text
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function toggleTheme()
+    isDarkTheme = not isDarkTheme
+    
+    ThemeButton.Text = isDarkTheme and "🌙" or "☀️"
+    
+    local currentTheme = isDarkTheme and themes.dark or themes.light
+    
+    local allInstances = {}
+    table.insert(allInstances, Main)
+    table.insert(allInstances, TopBar)
+    
+    for _, instance in pairs(Main:GetDescendants()) do
+        if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextLabel") or instance:IsA("TextBox") then
+            table.insert(allInstances, instance)
+        end
+    end
+    
+    for _, instance in pairs(TopBar:GetDescendants()) do
+        if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextLabel") or instance:IsA("TextBox") then
+            table.insert(allInstances, instance)
+        end
+    end
+    
+    for _, instance in ipairs(allInstances) do
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local properties = {}
+        
+        if instance:IsA("Frame") then
+            if instance == Main then
+                properties.BackgroundColor3 = currentTheme.main
+            elseif instance == TopBar then
+                properties.BackgroundColor3 = currentTheme.topBar
+            elseif instance == SliderKnob then
+            else
+                properties.BackgroundColor3 = currentTheme.elements
+            end
+        elseif instance:IsA("TextButton") or instance:IsA("TextBox") then
+            properties.BackgroundColor3 = currentTheme.elements
+            properties.TextColor3 = currentTheme.text
+        elseif instance:IsA("TextLabel") then
+            properties.TextColor3 = currentTheme.text
+            
+            if instance == VersionText then
+                properties.TextTransparency = isDarkTheme and 0.7 or 0.5
+            end
+        end
+        
+        if next(properties) then
+            local tween = TweenService:Create(instance, tweenInfo, properties)
+            tween:Play()
+        end
+    end
+    
+    local themeType = isDarkTheme and "Dark" or "Light"
+    notify("Theme Changed", themeType .. " theme applied", "info", 3)
+    
+	_G.GauntletTheme = isDarkTheme and "dark" or "light"
+end
+
+ThemeButton.MouseButton1Click:Connect(toggleTheme)
+
+UserInputService.InputBegan:Connect(function(key, processed)
+    if key.KeyCode == Enum.KeyCode.T and not processed then
+        toggleTheme()
+    end
+end)
+
+if _G.GauntletTheme == "light" then
+    toggleTheme()
+end
+
 local function updateMiscScrollingFrame()
     AutoClickerLabel.Size = UDim2.new(0.8, 0, 0.08, 0)
     AutoClickerLabel.Position = UDim2.new(0.1, 0, 0.15, 0)
@@ -593,6 +966,9 @@ local function toggleMainView()
     KeyInputsFrame.Visible = false
     StealthKeyLabel.Visible = isVisible
     StealthKeyInput.Visible = isVisible
+	LogsFrame.Visible = false
+    MapSelectionFrame.Visible = false
+    SettingsFrame.Visible = false
 end
 
 local function showChangelog()
@@ -610,6 +986,9 @@ local function showChangelog()
     FlingKeyInput.Visible = false
     StealthKeyLabel.Visible = false
     StealthKeyInput.Visible = false
+	LogsFrame.Visible = false
+    MapSelectionFrame.Visible = false
+    SettingsFrame.Visible = false
 end
 
 local function thingie()
@@ -627,6 +1006,69 @@ local function thingie()
     FlingKeyInput.Visible = false
     StealthKeyLabel.Visible = false
     StealthKeyInput.Visible = false
+	LogsFrame.Visible = false
+    MapSelectionFrame.Visible = false
+    SettingsFrame.Visible = false
+end
+
+local function showLogsView()
+    FBool.Visible = false
+    Checkorx.Visible = false
+    log.Visible = false
+    ForceSlider.Visible = false
+    ForceLabel.Visible = false
+    MiscScrollingFrame.Visible = false
+    AutoClickerLabel.Visible = false
+    KeyInputsFrame.Visible = false
+    TrajectoryToggle.Visible = false
+    TrajectoryButton.Visible = false
+    FlingKeyLabel.Visible = false
+    FlingKeyInput.Visible = false
+    StealthKeyLabel.Visible = false
+    StealthKeyInput.Visible = false
+    SettingsFrame.Visible = false
+    MapSelectionFrame.Visible = false
+    LogsFrame.Visible = true
+end
+
+local function showSettingsView()
+    FBool.Visible = false
+    Checkorx.Visible = false
+    log.Visible = false
+    ForceSlider.Visible = false
+    ForceLabel.Visible = false
+    MiscScrollingFrame.Visible = false
+    AutoClickerLabel.Visible = false
+    KeyInputsFrame.Visible = false
+    TrajectoryToggle.Visible = false
+    TrajectoryButton.Visible = false
+    FlingKeyLabel.Visible = false
+    FlingKeyInput.Visible = false
+    StealthKeyLabel.Visible = false
+    StealthKeyInput.Visible = false
+    LogsFrame.Visible = false
+    MapSelectionFrame.Visible = false
+    SettingsFrame.Visible = true
+end
+
+local function showMapSelectionView()
+    FBool.Visible = false
+    Checkorx.Visible = false
+    log.Visible = false
+    ForceSlider.Visible = false
+    ForceLabel.Visible = false
+    MiscScrollingFrame.Visible = false
+    AutoClickerLabel.Visible = false
+    KeyInputsFrame.Visible = false
+    TrajectoryToggle.Visible = false
+    TrajectoryButton.Visible = false
+    FlingKeyLabel.Visible = false
+    FlingKeyInput.Visible = false
+    StealthKeyLabel.Visible = false
+    StealthKeyInput.Visible = false
+    LogsFrame.Visible = false
+    SettingsFrame.Visible = false
+    MapSelectionFrame.Visible = true
 end
 
 local function toggleStealthMode()
@@ -707,6 +1149,208 @@ mainB.MouseButton1Click:Connect(toggleMainView)
 homeB.MouseButton1Click:Connect(showChangelog)
 miscB.MouseButton1Click:Connect(thingie)
 StealthButton.MouseButton1Click:Connect(toggleStealthMode)
+logB.MouseButton1Click:Connect(showLogsView)
+settingsB.MouseButton1Click:Connect(showSettingsView)
+MapsButton.MouseButton1Click:Connect(showMapSelectionView)
+
+local function addLogEntry(text, color)
+    local entry = Instance.new("TextLabel")
+    entry.Size = UDim2.new(0.95, 0, 0, 25)
+    entry.Position = UDim2.new(0.025, 0, 0, (#LogsFrame:GetChildren() * 30))
+    entry.BackgroundTransparency = 0.9
+    entry.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    entry.Text = text
+    entry.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    entry.TextSize = 14
+    entry.Font = Enum.Font.Gotham
+    entry.TextXAlignment = Enum.TextXAlignment.Left
+    entry.TextWrapped = true
+    entry.Parent = LogsFrame
+    
+    local entryCorner = Instance.new("UICorner")
+    entryCorner.CornerRadius = UDim.new(0, 4)
+    entryCorner.Parent = entry
+    
+    LogsFrame.CanvasSize = UDim2.new(0, 0, 0, (#LogsFrame:GetChildren() * 30) + 10)
+    LogsFrame.CanvasPosition = Vector2.new(0, LogsFrame.CanvasSize.Y.Offset)
+end
+
+local function dlog(message, category)
+    category = category or "Info"
+    local timestamp = os.date("%H:%M:%S")
+    local logEntry = "[" .. timestamp .. "] [" .. category .. "] " .. message
+    
+    if debugMode then
+        table.insert(debugLogs, 1, {text = logEntry, category = category})
+        if #debugLogs > maxDebugLogs then
+            table.remove(debugLogs)
+        end
+        
+        print("[GAUNTLET DEBUG] " .. logEntry)
+        addLogEntry(logEntry, 
+            category == "Error" and Color3.fromRGB(255, 100, 100) or
+            category == "Warning" and Color3.fromRGB(255, 200, 0) or
+            category == "Success" and Color3.fromRGB(100, 255, 100) or
+            Color3.fromRGB(85, 170, 255))
+    end
+    
+    return logEntry
+end
+
+addLogEntry("[" .. os.date("%H:%M:%S") .. "] Script initialized", Color3.fromRGB(85, 255, 127))
+addLogEntry("[" .. os.date("%H:%M:%S") .. "] Map tracking active", Color3.fromRGB(85, 170, 255))
+
+local function populateMapList()
+    for _, child in pairs(MapScrollFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    for i, mapName in ipairs(mapTable) do
+        local mapEntry = Instance.new("Frame")
+        mapEntry.Size = UDim2.new(0.95, 0, 0, 40)
+        mapEntry.Position = UDim2.new(0.025, 0, 0, (i-1) * 45 + 5)
+        mapEntry.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+        mapEntry.BorderSizePixel = 0
+        mapEntry.Parent = MapScrollFrame
+        
+        local mapEntryCorner = Instance.new("UICorner")
+        mapEntryCorner.CornerRadius = UDim.new(0, 6)
+        mapEntryCorner.Parent = mapEntry
+        
+        local mapNameLabel = Instance.new("TextLabel")
+        mapNameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+        mapNameLabel.Position = UDim2.new(0.05, 0, 0, 0)
+        mapNameLabel.BackgroundTransparency = 1
+        mapNameLabel.Text = mapName
+        mapNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        mapNameLabel.TextSize = 16
+        mapNameLabel.Font = Enum.Font.GothamMedium
+        mapNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        mapNameLabel.Parent = mapEntry
+        
+        local deleteButton = Instance.new("TextButton")
+        deleteButton.Size = UDim2.new(0.1, 0, 0.7, 0)
+        deleteButton.Position = UDim2.new(0.85, 0, 0.15, 0)
+        deleteButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        deleteButton.Text = "✕"
+        deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        deleteButton.TextSize = 14
+        deleteButton.Font = Enum.Font.GothamBold
+        deleteButton.Parent = mapEntry
+        
+        local deleteButtonCorner = Instance.new("UICorner")
+        deleteButtonCorner.CornerRadius = UDim.new(0, 4)
+        deleteButtonCorner.Parent = deleteButton
+        
+        deleteButton.MouseButton1Click:Connect(function()
+            table.remove(mapTable, i)
+            populateMapList()
+            addLogEntry("[" .. os.date("%H:%M:%S") .. "] Removed map: " .. mapName, Color3.fromRGB(255, 100, 100))
+        end)
+    end
+    
+    local newMapFrame = Instance.new("Frame")
+    newMapFrame.Size = UDim2.new(0.95, 0, 0, 40)
+    newMapFrame.Position = UDim2.new(0.025, 0, 0, (#mapTable * 45) + 10)
+    newMapFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    newMapFrame.BorderSizePixel = 0
+    newMapFrame.Parent = MapScrollFrame
+    
+    local newMapFrameCorner = Instance.new("UICorner")
+    newMapFrameCorner.CornerRadius = UDim.new(0, 6)
+    newMapFrameCorner.Parent = newMapFrame
+    
+    local newMapInput = Instance.new("TextBox")
+    newMapInput.Size = UDim2.new(0.7, 0, 0.7, 0)
+    newMapInput.Position = UDim2.new(0.05, 0, 0.15, 0)
+    newMapInput.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    newMapInput.Text = ""
+    newMapInput.PlaceholderText = "Add new map..."
+    newMapInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    newMapInput.TextSize = 14
+    newMapInput.Font = Enum.Font.Gotham
+    newMapInput.Parent = newMapFrame
+    
+    local newMapInputCorner = Instance.new("UICorner")
+    newMapInputCorner.CornerRadius = UDim.new(0, 4)
+    newMapInputCorner.Parent = newMapInput
+    
+    local addButton = Instance.new("TextButton")
+    addButton.Size = UDim2.new(0.15, 0, 0.7, 0)
+    addButton.Position = UDim2.new(0.8, 0, 0.15, 0)
+    addButton.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+    addButton.Text = "+"
+    addButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    addButton.TextSize = 16
+    addButton.Font = Enum.Font.GothamBold
+    addButton.Parent = newMapFrame
+    
+    local addButtonCorner = Instance.new("UICorner")
+    addButtonCorner.CornerRadius = UDim.new(0, 4)
+    addButtonCorner.Parent = addButton
+    
+    addButton.MouseButton1Click:Connect(function()
+        if newMapInput.Text ~= "" then
+            table.insert(mapTable, newMapInput.Text)
+            populateMapList()
+            addLogEntry("[" .. os.date("%H:%M:%S") .. "] Added map: " .. newMapInput.Text, Color3.fromRGB(100, 255, 100))
+        end
+    end)
+    
+    MapScrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#mapTable * 45) + 60)
+end
+
+populateMapList()
+
+HelpButton.MouseButton1Click:Connect(function()
+    notify("Help", "Click on tabs to navigate. Use Maps button to configure auto-voting maps. Settings for additional options.", "info", 8)
+end)
+
+local function applyTheme(theme)
+    Main.BackgroundColor3 = theme.main
+    TopBar.BackgroundColor3 = theme.topBar
+    
+    Title.TextColor3 = theme.title
+    User.TextColor3 = theme.text
+    VersionText.TextColor3 = theme.text
+    VersionText.TextTransparency = isDarkTheme and 0.7 or 0.5
+    
+    for _, button in ipairs({mainB, miscB, homeB, logB, settingsB}) do
+        button.BackgroundColor3 = theme.elements
+        button.TextColor3 = theme.text
+    end
+    
+    for _, instance in ipairs({
+        Checkorx, ForceSlider, SliderKnob, TrajectoryButton, 
+        FlingKeyInput, StealthKeyInput, StealthButton, ThemeButton,
+        onKey, offKey, MapsButton, HelpButton, DebugToggle, 
+        PerformanceToggle, SaveSettingsButton, ResetSettingsButton
+    }) do
+        if instance:IsA("TextButton") or instance:IsA("TextBox") then
+            instance.BackgroundColor3 = theme.elements
+            instance.TextColor3 = theme.text
+        elseif instance:IsA("Frame") then
+            instance.BackgroundColor3 = theme.elements
+        end
+    end
+    
+    for _, label in ipairs({
+        FBool, ForceLabel, TrajectoryToggle, FlingKeyLabel, 
+        StealthKeyLabel, log, AntiAFKLabel, AutoClickerLabel,
+        OnKeyLabel, OffKeyLabel, DebugToggleLabel, PerformanceToggleLabel,
+        MapSelectionHeading
+    }) do
+        label.TextColor3 = theme.text
+    end
+    
+    SliderKnob.BackgroundColor3 = Color3.fromRGB(250, 227, 54)
+    
+    if MapScrollFrame then
+        MapScrollFrame.BackgroundColor3 = Color3.fromRGB(isDarkTheme and 35 or 220, isDarkTheme and 35 or 220, isDarkTheme and 40 or 225)
+    end
+end
 
 local dragging
 local dragInput
@@ -1041,6 +1685,302 @@ UserInputService.InputBegan:Connect(function(key, processed)
     end
 end)
 
+local performanceMode = false
+local trajectoryPointsInPerformanceMode = 50
+local originalMaxPoints = maxPoints
+
+local settingsData = {
+    isDarkTheme = true,
+    debugMode = false,
+    performanceMode = false,
+    flingKey = "F",
+    stealthKey = "X",
+    force = 1000,
+    showTrajectory = false,
+    antiAFK = false,
+    autoClickerOnKey = "",
+    autoClickerOffKey = "",
+    maps = {"bfur", "Line"}
+}
+
+local function loadSettings()
+    local success, result
+    
+    if isfile and readfile and isfile("gauntlet_settings.json") then
+        success, result = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile("gauntlet_settings.json"))
+        end)
+    end
+    
+    if success and result then
+        isDarkTheme = result.isDarkTheme
+        debugMode = result.debugMode
+        performanceMode = result.performanceMode
+        force = result.force or 1000
+        mapTable = result.maps or {"bfur", "Line"}
+        
+        ThemeButton.Text = isDarkTheme and "🌙" or "☀️"
+        DebugToggle.Text = debugMode and "✅" or "❌"
+        PerformanceToggle.Text = performanceMode and "✅" or "❌"
+        ForceLabel.Text = "Force: " .. force
+        SliderKnob.Position = UDim2.new(force/2000, 0, -0.5, 0)
+        TrajectoryButton.Text = result.showTrajectory and "✅" or "❌"
+        showingTrajectory = result.showTrajectory
+        Checkorx.Text = result.flingEnabled and "✅" or "❌"
+        FlingKeyInput.Text = result.flingKey or "F"
+        StealthKeyInput.Text = result.stealthKey or "X"
+        AntiAFKToggle.Text = result.antiAFK and "✅" or "❌"
+        antiAFKEnabled = result.antiAFK
+        
+        if result.autoClickerOnKey and result.autoClickerOnKey ~= "" then
+            onKey.Text = result.autoClickerOnKey
+            onKeyCode = Enum.KeyCode[result.autoClickerOnKey]
+        end
+        
+        if result.autoClickerOffKey and result.autoClickerOffKey ~= "" then
+            offKey.Text = result.autoClickerOffKey
+            offKeyCode = Enum.KeyCode[result.autoClickerOffKey]
+        end
+        
+        if result.flingKey and result.flingKey ~= "" then
+            currentFlingKey = Enum.KeyCode[result.flingKey]
+        end
+        
+        if result.stealthKey and result.stealthKey ~= "" then
+            currentStealthKey = Enum.KeyCode[result.stealthKey]
+        end
+        
+        applyTheme(isDarkTheme and themes.dark or themes.light)
+        populateMapList()
+        
+        if performanceMode then
+            maxPoints = trajectoryPointsInPerformanceMode
+        end
+        
+        dlog("Settings loaded successfully", "Success")
+        notify("gauntlet.lol", "Settings loaded successfully", "success", 3)
+    else
+        dlog("No settings found or failed to load settings, using defaults", "Warning")
+    end
+end
+
+local function saveSettings()
+    if not writefile then
+        notify("gauntlet.lol Error", "Your exploit doesn't support saving settings", "error", 5)
+        return false
+    end
+    
+    local settingsToSave = {
+        isDarkTheme = isDarkTheme,
+        debugMode = debugMode,
+        performanceMode = performanceMode,
+        flingEnabled = Checkorx.Text == "✅",
+        force = force,
+        showTrajectory = showingTrajectory,
+        flingKey = FlingKeyInput.Text,
+        stealthKey = StealthKeyInput.Text,
+        antiAFK = antiAFKEnabled,
+        autoClickerOnKey = onKey.Text,
+        autoClickerOffKey = offKey.Text,
+        maps = mapTable
+    }
+    
+    local success, result = pcall(function()
+        local json = game:GetService("HttpService"):JSONEncode(settingsToSave)
+        writefile("gauntlet_settings.json", json)
+        return true
+    end)
+    
+    if success and result then
+        dlog("Settings saved successfully", "Success")
+        notify("gauntlet.lol", "Settings saved successfully", "success", 3)
+        return true
+    else
+        dlog("Failed to save settings: " .. tostring(result), "Error")
+        notify("gauntlet.lol Error", "Failed to save settings", "error", 5)
+        return false
+    end
+end
+
+local function applyDebugMode()
+    if debugMode then
+        dlog("Debug mode enabled", "Success")
+        
+        for _, child in pairs(LogsFrame:GetChildren()) do
+            if child:IsA("TextLabel") then
+                child:Destroy()
+            end
+        end
+        
+        for i, log in ipairs(debugLogs) do
+            addLogEntry(log.text, 
+                log.category == "Error" and Color3.fromRGB(255, 100, 100) or
+                log.category == "Warning" and Color3.fromRGB(255, 200, 0) or
+                log.category == "Success" and Color3.fromRGB(100, 255, 100) or
+                Color3.fromRGB(85, 170, 255))
+        end
+    else
+        addLogEntry("[" .. os.date("%H:%M:%S") .. "] Debug mode disabled", Color3.fromRGB(255, 100, 100))
+    end
+end
+
+local function applyPerformanceMode()
+    if performanceMode then
+        maxPoints = trajectoryPointsInPerformanceMode
+        dlog("Performance mode enabled - trajectory points reduced to " .. trajectoryPointsInPerformanceMode, "Info")
+        
+        notify("Performance Mode", "Reduced visual effects and optimized rendering", "info", 3)
+    else
+        maxPoints = originalMaxPoints
+        dlog("Performance mode disabled - restored visual quality", "Info")
+    end
+end
+
+local function toggleDebugMode()
+    local isEnabled = DebugToggle.Text == "✅"
+    animateToggle(DebugToggle, not isEnabled)
+    debugMode = not isEnabled
+    applyDebugMode()
+end
+
+local function togglePerformanceMode()
+    local isEnabled = PerformanceToggle.Text == "✅"
+    animateToggle(PerformanceToggle, not isEnabled)
+    performanceMode = not isEnabled
+    applyPerformanceMode()
+end
+
+DebugToggle.MouseButton1Click:Connect(toggleDebugMode)
+PerformanceToggle.MouseButton1Click:Connect(togglePerformanceMode)
+
+SaveSettingsButton.MouseButton1Click:Connect(function()
+    saveSettings()
+end)
+
+ResetSettingsButton.MouseButton1Click:Connect(function()
+    local confirmDialog = Instance.new("Frame")
+    confirmDialog.Size = UDim2.new(0.7, 0, 0.3, 0)
+    confirmDialog.Position = UDim2.new(0.15, 0, 0.35, 0)
+    confirmDialog.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    confirmDialog.BorderSizePixel = 0
+    confirmDialog.ZIndex = 10
+    confirmDialog.Parent = Main
+    
+    local confirmDialogCorner = Instance.new("UICorner")
+    confirmDialogCorner.CornerRadius = UDim.new(0, 8)
+    confirmDialogCorner.Parent = confirmDialog
+    
+    local confirmText = Instance.new("TextLabel")
+    confirmText.Size = UDim2.new(0.9, 0, 0.5, 0)
+    confirmText.Position = UDim2.new(0.05, 0, 0.1, 0)
+    confirmText.BackgroundTransparency = 1
+    confirmText.Text = "Are you sure you want to reset all settings to default?"
+    confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    confirmText.TextSize = 16
+    confirmText.Font = Enum.Font.GothamBold
+    confirmText.TextWrapped = true
+    confirmText.ZIndex = 11
+    confirmText.Parent = confirmDialog
+    
+    local confirmYes = Instance.new("TextButton")
+    confirmYes.Size = UDim2.new(0.4, 0, 0.25, 0)
+    confirmYes.Position = UDim2.new(0.1, 0, 0.65, 0)
+    confirmYes.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+    confirmYes.Text = "Yes, Reset"
+    confirmYes.TextColor3 = Color3.fromRGB(255, 255, 255)
+    confirmYes.TextSize = 14
+    confirmYes.Font = Enum.Font.GothamBold
+    confirmYes.ZIndex = 11
+    confirmYes.Parent = confirmDialog
+    
+    local confirmYesCorner = Instance.new("UICorner")
+    confirmYesCorner.CornerRadius = UDim.new(0, 4)
+    confirmYesCorner.Parent = confirmYes
+    
+    local confirmNo = Instance.new("TextButton")
+    confirmNo.Size = UDim2.new(0.4, 0, 0.25, 0)
+    confirmNo.Position = UDim2.new(0.55, 0, 0.65, 0)
+    confirmNo.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    confirmNo.Text = "Cancel"
+    confirmNo.TextColor3 = Color3.fromRGB(255, 255, 255)
+    confirmNo.TextSize = 14
+    confirmNo.Font = Enum.Font.GothamBold
+    confirmNo.ZIndex = 11
+    confirmNo.Parent = confirmDialog
+    
+    local confirmNoCorner = Instance.new("UICorner")
+    confirmNoCorner.CornerRadius = UDim.new(0, 4)
+    confirmNoCorner.Parent = confirmNo
+    
+    confirmNo.MouseButton1Click:Connect(function()
+        confirmDialog:Destroy()
+    end)
+    
+    confirmYes.MouseButton1Click:Connect(function()
+        isDarkTheme = true
+        debugMode = false
+        performanceMode = false
+        force = 1000
+        mapTable = {"bfur", "Line"}
+        
+        ThemeButton.Text = "🌙"
+        DebugToggle.Text = "❌"
+        PerformanceToggle.Text = "❌"
+        ForceLabel.Text = "Force: 1000"
+        SliderKnob.Position = UDim2.new(0.5, 0, -0.5, 0)
+        TrajectoryButton.Text = "❌"
+        showingTrajectory = false
+        Checkorx.Text = "❌"
+        FlingKeyInput.Text = "F"
+        currentFlingKey = Enum.KeyCode.F
+        StealthKeyInput.Text = "X"
+        currentStealthKey = Enum.KeyCode.X
+        AntiAFKToggle.Text = "❌"
+        antiAFKEnabled = false
+        onKey.Text = "Press any key"
+        onKeyCode = nil
+        offKey.Text = "Press any key"
+        offKeyCode = nil
+        
+        applyTheme(themes.dark)
+        populateMapList()
+        maxPoints = originalMaxPoints
+        
+        dlog("Settings reset to defaults", "Warning")
+        notify("gauntlet.lol", "Settings reset to defaults", "warning", 3)
+        
+        confirmDialog:Destroy()
+    end)
+end)
+
+loadSettings()
+
+local originalAddLogEntry = addLogEntry
+addLogEntry = function(text, color)
+    originalAddLogEntry(text, color)
+    
+    if debugMode and text:sub(1, 1) ~= "[" then
+        table.insert(debugLogs, 1, {text = "[" .. os.date("%H:%M:%S") .. "] " .. text, category = "Info"})
+        if #debugLogs > maxDebugLogs then
+            table.remove(debugLogs)
+        end
+    end
+end
+
+local originalNotify = notify
+notify = function(title, message, type, duration)
+    originalNotify(title, message, type, duration)
+    
+    if debugMode then
+        local category = 
+            type == "error" and "Error" or
+            type == "warning" and "Warning" or
+            type == "success" and "Success" or
+            "Info"
+        
+        dlog(title .. ": " .. message, category)
+    end
+end
 
 local function autoVote()
     local connection
