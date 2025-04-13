@@ -4,6 +4,13 @@ An **exploit GUI** designed for [SpeedBLOX: Gauntlet Flinging](https://www.roblo
 
 ---
 
+## 🌐 Official Site
+
+Visit the official site for updates, previews, and more:  
+**[gauntlet.lol Website](https://gauntletlol.github.io/gauntlet.lol.github.io/)**
+
+---
+
 ## 📜 Main Script
 
 > **Stable release**: For heavily tested and publicly released versions of gauntlet.lol.
