@@ -4,19 +4,22 @@ An **exploit GUI** designed for [SpeedBLOX: Gauntlet Flinging](https://www.roblo
 
 ---
 
-## 🌐 Official Site
+## 📜 Main Script
 
-Visit the official site for updates, previews, and more:  
-**[gauntlet.lol Website](https://gauntletlol.github.io/gauntlet.lol.github.io/)**
+> **Stable release**: For heavily tested and publicly released versions of gauntlet.lol.
+
+**🔗 Script URL:**  
+[`gauntlet.lol.lua`](https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/experimental/Script/gauntlet.lol.lua)
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/experimental/Script/gauntlet.lol.lua"))()
+```
 
 ---
 
-## 📜 Main Script
+## 📣 Contributing
 
-> **Experimental release**: New additions of gauntlet.lol that may be added to the official build.
+Contributions are welcome!  
+Feel free to open [issues](https://github.com/nahhkandy/gauntlet.lol/issues) or submit a [pull request](https://github.com/nahhkandy/gauntlet.lol/pulls) to help improve the project.
 
-**🔗 Script URL:**  
-[`gauntlet.lol.lua`](https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/main/Script/gauntlet.lol.lua)
-
-```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/main/Script/gauntlet.lol.lua"))()
+Make sure your changes are clean, documented, and tested before submitting.
