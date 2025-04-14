@@ -4,10 +4,9 @@ An **exploit GUI** designed for [SpeedBLOX: Gauntlet Flinging](https://www.roblo
 
 ---
 
-## 🌐 Official Site
+## 🚧 Next Update
 
-Visit the official site for updates, previews, and more:  
-**[gauntlet.lol Website](https://gauntletlol.github.io/gauntlet.lol.github.io/)**
+🗓 **Planned Release:** `May 11th, 2025`
 
 ---
 
@@ -20,3 +19,13 @@ Visit the official site for updates, previews, and more:
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/main/Script/gauntlet.lol.lua"))()
+```
+
+---
+
+## 📣 Contributing
+
+Contributions are welcome!  
+Feel free to open [issues](https://github.com/nahhkandy/gauntlet.lol/issues) or submit a [pull request](https://github.com/nahhkandy/gauntlet.lol/pulls) to help improve the project.
+
+Make sure your changes are clean, documented, and tested before submitting.
