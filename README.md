@@ -4,9 +4,9 @@ An **exploit GUI** designed for [SpeedBLOX: Gauntlet Flinging](https://www.roblo
 
 ---
 
-## 📜 Main Script
+## 📜 Experimental Script
 
-> **Stable release**: For heavily tested and publicly released versions of gauntlet.lol.
+> **Experimental release**: Versions of gauntlet.lol that may be added to the main script.
 
 **🔗 Script URL:**  
 [`gauntlet.lol.lua`](https://raw.githubusercontent.com/nahhkandy/gauntlet.lol/refs/heads/experimental/Script/gauntlet.lol.lua)
